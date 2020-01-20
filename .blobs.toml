@@ -1,0 +1,13 @@
+[collections.www]
+name = 'www'
+keys = ['url']
+
+[collections.www.retrieval]
+type = 'url'
+
+[[collections.www.item]]
+digest = '2893711305a92a8096c3dd3300a75fe580bc032a5828815f0444b0109850a100'
+size = 322109440
+url = 'http://cloud-images.ubuntu.com/bionic/20200116.1/bionic-server-cloudimg-amd64-vagrant.box'
+
+[collections.www.metadata]

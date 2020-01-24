@@ -1,0 +1,12 @@
+[package]
+name = "displayer"
+version = "0.1.0"
+authors = ["Peter Williams <peter@newton.cx>"]
+edition = "2018"
+
+[dependencies]
+## wiringpi = "0.2"
+embedded-graphics = "^0.5"
+embedded-hal = { version = "^0.2", features = ["unproven"] }
+epd-waveshare = { git = "https://github.com/caemor/epd-waveshare", branch = "master", features = ["epd7in5", "graphics"]}
+linux-embedded-hal = "0.2"

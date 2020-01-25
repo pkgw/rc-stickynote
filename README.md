@@ -1,7 +1,7 @@
-# Raspberry Pi eInk Message Panel Project
+# Raspberry Pi e-Print Display Message Panel Project
 
 The software component of a project to show custom messages on a Raspberry Pi
-hooked up to an e-Ink display.
+hooked up to an e-Print display (EPD).
 
 An important aspect of this project is that it is a testbed for using the
 [blobman][blobman] framework to construct the necessary software in as

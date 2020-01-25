@@ -1,3 +1,6 @@
+//! The program that renders information to the e-Print Display. (Or a
+//! simulated version thereof.)
+
 use embedded_graphics::{
     coord::Coord,
     fonts::{Font12x16, Font6x8},
@@ -5,162 +8,103 @@ use embedded_graphics::{
     primitives::{Circle, Line},
     Drawing,
 };
-use embedded_hal::prelude::*;
-use epd_waveshare::{
-    epd7in5::{Display7in5, EPD7in5},
-    graphics::{Display, DisplayRotation},
-    prelude::*,
-};
-use linux_embedded_hal::{
-    spidev::{self, SpidevOptions},
-    sysfs_gpio::Direction,
-    Delay, Pin, Spidev,
-};
+use std::io::Error;
 
-// activate spi, gpio in raspi-config
-// needs to be run with sudo because of some sysfs_gpio permission problems and follow-up timing problems
-// see https://github.com/rust-embedded/rust-sysfs-gpio/issues/5 and follow-up issues
+#[cfg(feature = "waveshare")]
+mod epd7in5;
+#[cfg(feature = "waveshare")]
+use epd7in5::EPD7in5Backend as Backend;
 
-fn main() {
-    if let Err(e) = run() {
-        eprintln!("Program exited early with error: {}", e);
-    }
+#[cfg(feature = "simulator")]
+mod simulator;
+#[cfg(feature = "simulator")]
+use simulator::SimulatorBackend as Backend;
+
+trait DisplayBackend: Sized {
+    type Color: embedded_graphics::pixelcolor::PixelColor;
+    type Display: Drawing<Self::Color>;
+
+    const BLACK: Self::Color;
+    const WHITE: Self::Color;
+
+    fn open() -> Result<Self, Error>;
+    fn get_display_mut(&mut self) -> &mut Self::Display;
+    fn clear(&mut self, color: Self::Color) -> Result<(), Error>;
+    fn show(&mut self) -> Result<(), Error>;
+    fn sleep(&mut self) -> Result<(), Error>;
 }
 
-fn run() -> Result<(), std::io::Error> {
-    // Configure SPI
-    // Settings are taken from
-    let mut spi = Spidev::open("/dev/spidev0.0").expect("spidev directory");
-    let options = SpidevOptions::new()
-        .bits_per_word(8)
-        .max_speed_hz(4_000_000)
-        .mode(spidev::SPI_MODE_0)
-        .build();
-    spi.configure(&options).expect("spi configuration");
+fn main() -> Result<(), std::io::Error> {
+    let mut backend = Backend::open()?;
 
-    // Configure Digital I/O Pin to be used as Chip Select for SPI
-    let cs = Pin::new(8);
-    cs.export().expect("cs export");
-    while !cs.is_exported() {}
-    cs.set_direction(Direction::Out).expect("CS Direction");
-    cs.set_value(1).expect("CS Value set to 1");
+    {
+        let display = backend.get_display_mut();
 
-    let busy = Pin::new(24);
-    busy.export().expect("busy export");
-    while !busy.is_exported() {}
-    busy.set_direction(Direction::In).expect("busy Direction");
+        display.draw(
+            Font6x8::render_str("Rotate 270!")
+                .stroke(Some(Backend::BLACK))
+                .fill(Some(Backend::WHITE))
+                .translate(Coord::new(5, 50))
+                .into_iter(),
+        );
+    }
 
-    let dc = Pin::new(25);
-    dc.export().expect("dc export");
-    while !dc.is_exported() {}
-    dc.set_direction(Direction::Out).expect("dc Direction");
-    dc.set_value(1).expect("dc Value set to 1");
-
-    let rst = Pin::new(17);
-    rst.export().expect("rst export");
-    while !rst.is_exported() {}
-    rst.set_direction(Direction::Out).expect("rst Direction");
-    rst.set_value(1).expect("rst Value set to 1");
-
-    let mut delay = Delay {};
-
-    let mut epd7in5 =
-        EPD7in5::new(&mut spi, cs, busy, dc, rst, &mut delay).expect("eink initalize error");
-
-    println!("Test all the rotations");
-    let mut display = Display7in5::default();
-    display.set_rotation(DisplayRotation::Rotate0);
-    display.draw(
-        Font6x8::render_str("Rotate 0!")
-            .stroke(Some(Color::Black))
-            .fill(Some(Color::White))
-            .translate(Coord::new(5, 50))
-            .into_iter(),
-    );
-
-    display.set_rotation(DisplayRotation::Rotate90);
-    display.draw(
-        Font6x8::render_str("Rotate 90!")
-            .stroke(Some(Color::Black))
-            .fill(Some(Color::White))
-            .translate(Coord::new(5, 50))
-            .into_iter(),
-    );
-
-    display.set_rotation(DisplayRotation::Rotate180);
-    display.draw(
-        Font6x8::render_str("Rotate 180!")
-            .stroke(Some(Color::Black))
-            .fill(Some(Color::White))
-            .translate(Coord::new(5, 50))
-            .into_iter(),
-    );
-
-    display.set_rotation(DisplayRotation::Rotate270);
-    display.draw(
-        Font6x8::render_str("Rotate 270!")
-            .stroke(Some(Color::Black))
-            .fill(Some(Color::White))
-            .translate(Coord::new(5, 50))
-            .into_iter(),
-    );
-
-    epd7in5.update_frame(&mut spi, &display.buffer()).unwrap();
-    epd7in5
-        .display_frame(&mut spi)
-        .expect("display frame new graphics");
+    backend.show()?;
 
     println!("Immediate custom test!");
-    display.clear_buffer(Color::White);
+    backend.clear(Backend::WHITE)?;
 
-    // draw a analog clock
-    display.draw(
-        Circle::new(Coord::new(64, 64), 64)
-            .stroke(Some(Color::Black))
-            .into_iter(),
-    );
-    display.draw(
-        Line::new(Coord::new(64, 64), Coord::new(0, 64))
-            .stroke(Some(Color::Black))
-            .into_iter(),
-    );
-    display.draw(
-        Line::new(Coord::new(64, 64), Coord::new(80, 80))
-            .stroke(Some(Color::Black))
-            .into_iter(),
-    );
+    {
+        let display = backend.get_display_mut();
 
-    // draw white on black background
-    display.draw(
-        Font6x8::render_str("It's working-WoB!")
-            // Using Style here
-            .style(Style {
-                fill_color: Some(Color::Black),
-                stroke_color: Some(Color::White),
-                stroke_width: 0u8, // Has no effect on fonts
-            })
-            .translate(Coord::new(175, 250))
-            .into_iter(),
-    );
+        // draw a analog clock
+        display.draw(
+            Circle::new(Coord::new(64, 64), 64)
+                .stroke(Some(Backend::BLACK))
+                .into_iter(),
+        );
+        display.draw(
+            Line::new(Coord::new(64, 64), Coord::new(0, 64))
+                .stroke(Some(Backend::BLACK))
+                .into_iter(),
+        );
+        display.draw(
+            Line::new(Coord::new(64, 64), Coord::new(80, 80))
+                .stroke(Some(Backend::BLACK))
+                .into_iter(),
+        );
 
-    // use bigger/different font
-    display.draw(
-        Font12x16::render_str("Hello World from Rust!")
-            // Using Style here
-            .style(Style {
-                fill_color: Some(Color::White),
-                stroke_color: Some(Color::Black),
-                stroke_width: 0u8, // Has no effect on fonts
-            })
-            .translate(Coord::new(50, 200))
-            .into_iter(),
-    );
+        // draw white on black background
+        display.draw(
+            Font6x8::render_str("It's working-WoB!")
+                // Using Style here
+                .style(Style {
+                    fill_color: Some(Backend::BLACK),
+                    stroke_color: Some(Backend::WHITE),
+                    stroke_width: 0u8, // Has no effect on fonts
+                })
+                .translate(Coord::new(175, 250))
+                .into_iter(),
+        );
 
-    epd7in5.update_frame(&mut spi, &display.buffer()).unwrap();
-    epd7in5
-        .display_frame(&mut spi)
-        .expect("display frame new graphics");
+        // use bigger/different font
+        display.draw(
+            Font12x16::render_str("Hello World from Rust!")
+                // Using Style here
+                .style(Style {
+                    fill_color: Some(Backend::WHITE),
+                    stroke_color: Some(Backend::BLACK),
+                    stroke_width: 0u8, // Has no effect on fonts
+                })
+                .translate(Coord::new(50, 200))
+                .into_iter(),
+        );
+    }
+
+    backend.show()?;
 
     println!("Finished tests - going to sleep");
-    epd7in5.sleep(&mut spi)
+    backend.sleep()?;
+
+    Ok(())
 }

@@ -1,5 +1,3 @@
-#![deny(warnings)]
-
 use embedded_graphics::{
     coord::Coord,
     fonts::{Font12x16, Font6x8},
@@ -111,9 +109,8 @@ fn run() -> Result<(), std::io::Error> {
     epd7in5
         .display_frame(&mut spi)
         .expect("display frame new graphics");
-    delay.delay_ms(5000u16);
 
-    println!("Now test new graphics with default rotation and some special stuff:");
+    println!("Immediate custom test!");
     display.clear_buffer(Color::White);
 
     // draw a analog clock
@@ -148,7 +145,7 @@ fn run() -> Result<(), std::io::Error> {
 
     // use bigger/different font
     display.draw(
-        Font12x16::render_str("It's working-BoW!")
+        Font12x16::render_str("Hello World from Rust!")
             // Using Style here
             .style(Style {
                 fill_color: Some(Color::White),
@@ -159,29 +156,10 @@ fn run() -> Result<(), std::io::Error> {
             .into_iter(),
     );
 
-    // a moving `Hello World!`
-    let limit = 10;
-    for i in 0..limit {
-        println!("Moving Hello World. Loop {} from {}", (i + 1), limit);
-
-        display.draw(
-            Font6x8::render_str("  Hello World! ")
-                .style(Style {
-                    fill_color: Some(Color::White),
-                    stroke_color: Some(Color::Black),
-                    stroke_width: 0u8, // Has no effect on fonts
-                })
-                .translate(Coord::new(5 + i * 12, 50))
-                .into_iter(),
-        );
-
-        epd7in5.update_frame(&mut spi, &display.buffer()).unwrap();
-        epd7in5
-            .display_frame(&mut spi)
-            .expect("display frame new graphics");
-
-        delay.delay_ms(1_000u16);
-    }
+    epd7in5.update_frame(&mut spi, &display.buffer()).unwrap();
+    epd7in5
+        .display_frame(&mut spi)
+        .expect("display frame new graphics");
 
     println!("Finished tests - going to sleep");
     epd7in5.sleep(&mut spi)

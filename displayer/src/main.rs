@@ -8,7 +8,7 @@ use embedded_graphics::{
     primitives::{Circle, Line},
     Drawing,
 };
-use std::io::Error;
+use std::{io::Error, thread, time::Duration};
 
 #[cfg(feature = "waveshare")]
 mod epd7in5;
@@ -38,27 +38,12 @@ trait DisplayBackend: Sized {
 fn main() -> Result<(), std::io::Error> {
     let mut backend = Backend::open()?;
 
-    {
-        let buffer = backend.get_buffer_mut();
-
-        buffer.draw(
-            Font6x8::render_str("Rotate 270!")
-                .stroke(Some(Backend::BLACK))
-                .fill(Some(Backend::WHITE))
-                .translate(Coord::new(5, 50))
-                .into_iter(),
-        );
-    }
-
-    backend.show_buffer()?;
-
-    println!("Immediate custom test!");
-    backend.clear_buffer(Backend::WHITE)?;
+    println!("Drawing some random junk ... ");
 
     {
         let buffer = backend.get_buffer_mut();
 
-        // draw a analog clock
+        // draw an analog clock
         buffer.draw(
             Circle::new(Coord::new(64, 64), 64)
                 .stroke(Some(Backend::BLACK))
@@ -104,8 +89,49 @@ fn main() -> Result<(), std::io::Error> {
 
     backend.show_buffer()?;
 
-    println!("Finished tests - going to sleep");
-    backend.sleep_device()?;
+    println!("Going into main loop ...");
 
-    Ok(())
+    loop {
+        backend.clear_buffer(Backend::WHITE)?;
+
+        // Get an IP address to show
+
+        let mut ip_text = "???.???.???.???".to_owned();
+
+        for iface in &get_if_addrs::get_if_addrs()? {
+            if !iface.is_loopback() {
+                if let get_if_addrs::IfAddr::V4(ref addr) = iface.addr {
+                    ip_text = addr.ip.to_string();
+                }
+            }
+        }
+
+        // Ready to render
+
+        {
+            let buffer = backend.get_buffer_mut();
+
+            buffer.draw(
+                Font12x16::render_str(&ip_text)
+                    .style(Style {
+                        fill_color: Some(Backend::WHITE),
+                        stroke_color: Some(Backend::BLACK),
+                        stroke_width: 0u8, // Has no effect on fonts
+                    })
+                    .translate(Coord::new(50, 50))
+                    .into_iter(),
+            );
+        }
+
+        backend.show_buffer()?;
+
+        // TODO: clock for events, not just sleeping!
+        thread::sleep(Duration::from_millis(600_000));
+    }
+
+    // println!("Finished tests - going to sleep");
+    // backend.clear_display()?;
+    // backend.sleep_device()?;
+    //
+    // Ok(())
 }

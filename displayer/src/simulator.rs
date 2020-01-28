@@ -284,7 +284,7 @@ impl DisplayBackend for SimulatorBackend {
         Ok(())
     }
 
-    fn sleep(&mut self) -> Result<(), Error> {
+    fn sleep_device(&mut self) -> Result<(), Error> {
         Ok(())
     }
 }

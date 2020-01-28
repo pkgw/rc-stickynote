@@ -31,7 +31,7 @@ trait DisplayBackend: Sized {
     fn get_buffer_mut(&mut self) -> &mut Self::Buffer;
     fn clear_buffer(&mut self, color: Self::Color) -> Result<(), Error>;
     fn show_buffer(&mut self) -> Result<(), Error>;
-    fn sleep(&mut self) -> Result<(), Error>;
+    fn sleep_device(&mut self) -> Result<(), Error>;
 }
 
 fn main() -> Result<(), std::io::Error> {
@@ -104,7 +104,7 @@ fn main() -> Result<(), std::io::Error> {
     backend.show_buffer()?;
 
     println!("Finished tests - going to sleep");
-    backend.sleep()?;
+    backend.sleep_device()?;
 
     Ok(())
 }

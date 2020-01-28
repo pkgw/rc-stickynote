@@ -22,14 +22,14 @@ use simulator::SimulatorBackend as Backend;
 
 trait DisplayBackend: Sized {
     type Color: embedded_graphics::pixelcolor::PixelColor;
-    type Display: Drawing<Self::Color>;
+    type Buffer: Drawing<Self::Color>;
 
     const BLACK: Self::Color;
     const WHITE: Self::Color;
 
     fn open() -> Result<Self, Error>;
-    fn get_display_mut(&mut self) -> &mut Self::Display;
-    fn clear(&mut self, color: Self::Color) -> Result<(), Error>;
+    fn get_buffer_mut(&mut self) -> &mut Self::Buffer;
+    fn clear_buffer(&mut self, color: Self::Color) -> Result<(), Error>;
     fn show(&mut self) -> Result<(), Error>;
     fn sleep(&mut self) -> Result<(), Error>;
 }
@@ -38,9 +38,9 @@ fn main() -> Result<(), std::io::Error> {
     let mut backend = Backend::open()?;
 
     {
-        let display = backend.get_display_mut();
+        let buffer = backend.get_buffer_mut();
 
-        display.draw(
+        buffer.draw(
             Font6x8::render_str("Rotate 270!")
                 .stroke(Some(Backend::BLACK))
                 .fill(Some(Backend::WHITE))
@@ -52,30 +52,30 @@ fn main() -> Result<(), std::io::Error> {
     backend.show()?;
 
     println!("Immediate custom test!");
-    backend.clear(Backend::WHITE)?;
+    backend.clear_buffer(Backend::WHITE)?;
 
     {
-        let display = backend.get_display_mut();
+        let buffer = backend.get_buffer_mut();
 
         // draw a analog clock
-        display.draw(
+        buffer.draw(
             Circle::new(Coord::new(64, 64), 64)
                 .stroke(Some(Backend::BLACK))
                 .into_iter(),
         );
-        display.draw(
+        buffer.draw(
             Line::new(Coord::new(64, 64), Coord::new(0, 64))
                 .stroke(Some(Backend::BLACK))
                 .into_iter(),
         );
-        display.draw(
+        buffer.draw(
             Line::new(Coord::new(64, 64), Coord::new(80, 80))
                 .stroke(Some(Backend::BLACK))
                 .into_iter(),
         );
 
         // draw white on black background
-        display.draw(
+        buffer.draw(
             Font6x8::render_str("It's working-WoB!")
                 // Using Style here
                 .style(Style {
@@ -88,7 +88,7 @@ fn main() -> Result<(), std::io::Error> {
         );
 
         // use bigger/different font
-        display.draw(
+        buffer.draw(
             Font12x16::render_str("Hello World from Rust!")
                 // Using Style here
                 .style(Style {

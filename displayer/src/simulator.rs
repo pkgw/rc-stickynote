@@ -247,7 +247,7 @@ pub struct SimulatorBackend {
 
 impl DisplayBackend for SimulatorBackend {
     type Color = SimPixelColor;
-    type Display = Display;
+    type Buffer = Display;
 
     const BLACK: SimPixelColor = SimPixelColor(true);
     const WHITE: SimPixelColor = SimPixelColor(false);
@@ -259,11 +259,11 @@ impl DisplayBackend for SimulatorBackend {
         Ok(SimulatorBackend { display })
     }
 
-    fn get_display_mut(&mut self) -> &mut Self::Display {
+    fn get_buffer_mut(&mut self) -> &mut Self::Buffer {
         &mut self.display
     }
 
-    fn clear(&mut self, color: Self::Color) -> Result<(), Error> {
+    fn clear_buffer(&mut self, color: Self::Color) -> Result<(), Error> {
         self.display.fill(color);
         Ok(())
     }

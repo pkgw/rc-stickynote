@@ -23,7 +23,7 @@ pub struct EPD7in5Backend {
 
 impl DisplayBackend for EPD7in5Backend {
     type Color = Color;
-    type Display = Display7in5;
+    type Buffer = Display7in5;
 
     const BLACK: Color = Color::Black;
     const WHITE: Color = Color::White;
@@ -76,12 +76,12 @@ impl DisplayBackend for EPD7in5Backend {
         })
     }
 
-    fn clear(&mut self, color: Self::Color) -> Result<(), Error> {
+    fn clear_buffer(&mut self, color: Self::Color) -> Result<(), Error> {
         self.display.clear_buffer(color);
         Ok(())
     }
 
-    fn get_display_mut(&mut self) -> &mut Self::Display {
+    fn get_buffer_mut(&mut self) -> &mut Self::Buffer {
         &mut self.display
     }
 

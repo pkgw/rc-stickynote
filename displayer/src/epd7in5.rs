@@ -94,6 +94,7 @@ impl DisplayBackend for EPD7in5Backend {
 
     fn clear_display(&mut self) -> Result<(), Error> {
         self.epd7in5.clear_frame(&mut self.spi)?;
+        self.epd7in5.display_frame(&mut self.spi)?;
         Ok(())
     }
 

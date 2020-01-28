@@ -9,6 +9,7 @@ use embedded_graphics::{
     Drawing,
 };
 use std::{io::Error, thread, time::Duration};
+use structopt::StructOpt;
 
 #[cfg(feature = "waveshare")]
 mod epd7in5;
@@ -35,103 +36,121 @@ trait DisplayBackend: Sized {
     fn sleep_device(&mut self) -> Result<(), Error>;
 }
 
-fn main() -> Result<(), std::io::Error> {
-    let mut backend = Backend::open()?;
+// clear-and-sleep subcommand
 
-    println!("Drawing some random junk ... ");
+#[derive(Debug, StructOpt)]
+pub struct ClearAndSleepCommand {}
 
-    {
-        let buffer = backend.get_buffer_mut();
-
-        // draw an analog clock
-        buffer.draw(
-            Circle::new(Coord::new(64, 64), 64)
-                .stroke(Some(Backend::BLACK))
-                .into_iter(),
-        );
-        buffer.draw(
-            Line::new(Coord::new(64, 64), Coord::new(0, 64))
-                .stroke(Some(Backend::BLACK))
-                .into_iter(),
-        );
-        buffer.draw(
-            Line::new(Coord::new(64, 64), Coord::new(80, 80))
-                .stroke(Some(Backend::BLACK))
-                .into_iter(),
-        );
-
-        // draw white on black background
-        buffer.draw(
-            Font6x8::render_str("It's working-WoB!")
-                // Using Style here
-                .style(Style {
-                    fill_color: Some(Backend::BLACK),
-                    stroke_color: Some(Backend::WHITE),
-                    stroke_width: 0u8, // Has no effect on fonts
-                })
-                .translate(Coord::new(175, 250))
-                .into_iter(),
-        );
-
-        // use bigger/different font
-        buffer.draw(
-            Font12x16::render_str("Hello World from Rust!")
-                // Using Style here
-                .style(Style {
-                    fill_color: Some(Backend::WHITE),
-                    stroke_color: Some(Backend::BLACK),
-                    stroke_width: 0u8, // Has no effect on fonts
-                })
-                .translate(Coord::new(50, 200))
-                .into_iter(),
-        );
+impl ClearAndSleepCommand {
+    fn cli(self) -> Result<(), Error> {
+        let mut backend = Backend::open()?;
+        backend.clear_display()?;
+        backend.sleep_device()?;
+        Ok(())
     }
+}
 
-    backend.show_buffer()?;
+// show-ips subcommand
 
-    println!("Going into main loop ...");
+#[derive(Debug, StructOpt)]
+pub struct ShowIpsCommand {}
 
-    loop {
-        backend.clear_buffer(Backend::WHITE)?;
-
-        // Get an IP address to show
-
-        let mut ip_text = "???.???.???.???".to_owned();
-
-        for iface in &get_if_addrs::get_if_addrs()? {
-            if !iface.is_loopback() {
-                if let get_if_addrs::IfAddr::V4(ref addr) = iface.addr {
-                    ip_text = addr.ip.to_string();
-                }
-            }
-        }
-
-        // Ready to render
+impl ShowIpsCommand {
+    fn cli(self) -> Result<(), Error> {
+        let mut backend = Backend::open()?;
 
         {
             let buffer = backend.get_buffer_mut();
+            let mut got_any = false;
 
-            buffer.draw(
-                Font12x16::render_str(&ip_text)
-                    .style(Style {
-                        fill_color: Some(Backend::WHITE),
-                        stroke_color: Some(Backend::BLACK),
-                        stroke_width: 0u8, // Has no effect on fonts
-                    })
-                    .translate(Coord::new(50, 50))
-                    .into_iter(),
-            );
+            // If this program is set up to run on boot, the WiFi might not be
+            // fully set up by the time we get here. So, retry several times
+            // if we don't find any interesting IP addresses.
+
+            for _ in 0..10 {
+                // Note that we don't need to clear the buffer here, since the only
+                // time we loop is when the buffer's contents are trivial.
+
+                let mut y = 50;
+
+                buffer.draw(
+                    Font6x8::render_str("IP addresses:")
+                        .style(Style {
+                            fill_color: Some(Backend::WHITE),
+                            stroke_color: Some(Backend::BLACK),
+                            stroke_width: 0u8, // Has no effect on fonts
+                        })
+                        .translate(Coord::new(50, y))
+                        .into_iter(),
+                );
+
+                y += 20;
+
+                for iface in &get_if_addrs::get_if_addrs()? {
+                    if !iface.is_loopback() {
+                        if let get_if_addrs::IfAddr::V4(ref addr) = iface.addr {
+                            let text = format!("{}   {}", iface.name, addr.ip);
+
+                            buffer.draw(
+                                Font6x8::render_str(&text)
+                                    .style(Style {
+                                        fill_color: Some(Backend::WHITE),
+                                        stroke_color: Some(Backend::BLACK),
+                                        stroke_width: 0u8, // Has no effect on fonts
+                                    })
+                                    .translate(Coord::new(50, y))
+                                    .into_iter(),
+                            );
+
+                            y += 10;
+                            got_any = true;
+                        }
+                    }
+                }
+
+                if got_any {
+                    break;
+                }
+
+                thread::sleep(Duration::from_millis(10_000));
+            }
+
+            if !got_any {
+                return Err(Error::new(
+                    std::io::ErrorKind::Other,
+                    "never got any useful IP addresses",
+                ));
+            }
         }
 
         backend.show_buffer()?;
-
-        // TODO: clock for events, not just sleeping!
-        thread::sleep(Duration::from_millis(600_000));
+        Ok(())
     }
+}
 
-    // println!("Finished tests - going to sleep");
-    // backend.clear_display()?;
-    // backend.sleep_device()?;
-    //
-    // Ok(())
+// CLI root interface
+
+#[derive(Debug, StructOpt)]
+#[structopt(name = "displayer", about = "e-Ink Displayer tools")]
+enum RootCli {
+    #[structopt(name = "clear-and-sleep")]
+    /// Clear the display and sleep the device
+    ClearAndSleep(ClearAndSleepCommand),
+
+    #[structopt(name = "show-ips")]
+    /// Show IP addresses on the display
+    ShowIps(ShowIpsCommand),
+}
+
+impl RootCli {
+    fn cli(self) -> Result<(), Error> {
+        match self {
+            RootCli::ClearAndSleep(opts) => opts.cli(),
+            RootCli::ShowIps(opts) => opts.cli(),
+        }
+    }
+}
+
+fn main() -> Result<(), Error> {
+    RootCli::from_args().cli()
 }

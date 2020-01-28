@@ -268,7 +268,7 @@ impl DisplayBackend for SimulatorBackend {
         Ok(())
     }
 
-    fn show(&mut self) -> Result<(), Error> {
+    fn show_buffer(&mut self) -> Result<(), Error> {
         println!("*** hit Escape when you're done looking at this image ***");
 
         loop {

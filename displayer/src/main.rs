@@ -30,7 +30,7 @@ trait DisplayBackend: Sized {
     fn open() -> Result<Self, Error>;
     fn get_buffer_mut(&mut self) -> &mut Self::Buffer;
     fn clear_buffer(&mut self, color: Self::Color) -> Result<(), Error>;
-    fn show(&mut self) -> Result<(), Error>;
+    fn show_buffer(&mut self) -> Result<(), Error>;
     fn sleep(&mut self) -> Result<(), Error>;
 }
 
@@ -49,7 +49,7 @@ fn main() -> Result<(), std::io::Error> {
         );
     }
 
-    backend.show()?;
+    backend.show_buffer()?;
 
     println!("Immediate custom test!");
     backend.clear_buffer(Backend::WHITE)?;
@@ -101,7 +101,7 @@ fn main() -> Result<(), std::io::Error> {
         );
     }
 
-    backend.show()?;
+    backend.show_buffer()?;
 
     println!("Finished tests - going to sleep");
     backend.sleep()?;

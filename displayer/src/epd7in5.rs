@@ -85,7 +85,7 @@ impl DisplayBackend for EPD7in5Backend {
         &mut self.display
     }
 
-    fn show(&mut self) -> Result<(), Error> {
+    fn show_buffer(&mut self) -> Result<(), Error> {
         self.epd7in5
             .update_frame(&mut self.spi, &self.display.buffer())?;
         self.epd7in5.display_frame(&mut self.spi)?;

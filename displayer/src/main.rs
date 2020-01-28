@@ -31,6 +31,7 @@ trait DisplayBackend: Sized {
     fn get_buffer_mut(&mut self) -> &mut Self::Buffer;
     fn clear_buffer(&mut self, color: Self::Color) -> Result<(), Error>;
     fn show_buffer(&mut self) -> Result<(), Error>;
+    fn clear_display(&mut self) -> Result<(), Error>;
     fn sleep_device(&mut self) -> Result<(), Error>;
 }
 

@@ -92,6 +92,11 @@ impl DisplayBackend for EPD7in5Backend {
         Ok(())
     }
 
+    fn clear_display(&mut self) -> Result<(), Error> {
+        self.epd7in5.clear_frame(&mut self.spi)?;
+        Ok(())
+    }
+
     fn sleep_device(&mut self) -> Result<(), Error> {
         Ok(self.epd7in5.sleep(&mut self.spi)?)
     }

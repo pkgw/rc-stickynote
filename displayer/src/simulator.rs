@@ -284,7 +284,13 @@ impl DisplayBackend for SimulatorBackend {
         Ok(())
     }
 
+    fn clear_display(&mut self) -> Result<(), Error> {
+        println!("*** simulator no-op: clear_display() ***");
+        Ok(())
+    }
+
     fn sleep_device(&mut self) -> Result<(), Error> {
+        println!("*** simulator no-op: sleep_device() ***");
         Ok(())
     }
 }

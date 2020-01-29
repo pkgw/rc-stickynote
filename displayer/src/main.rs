@@ -78,29 +78,58 @@ impl DemoFontCommand {
 
             buffer.draw(
                 font.rasterize("The quick brown fox jumps over the lazy dog.", 10.0)
-                    .draw_at(10, 10),
+                    .draw_at(10, 10, Backend::BLACK, Backend::WHITE),
             );
 
             buffer.draw(
                 font.rasterize("The quick brown fox jumps over the lazy dog.", 14.0)
-                    .draw_at(10, 30),
+                    .draw_at(10, 30, Backend::BLACK, Backend::WHITE),
             );
 
-            buffer.draw(font.rasterize("The quick brown fox", 20.0).draw_at(10, 58));
-            buffer.draw(
-                font.rasterize("jumps over the lazy dog.", 20.0)
-                    .draw_at(10, 80),
-            );
+            buffer.draw(font.rasterize("The quick brown fox", 20.0).draw_at(
+                10,
+                58,
+                Backend::BLACK,
+                Backend::WHITE,
+            ));
+            buffer.draw(font.rasterize("jumps over the lazy dog.", 20.0).draw_at(
+                10,
+                80,
+                Backend::BLACK,
+                Backend::WHITE,
+            ));
 
-            buffer.draw(font.rasterize("The quick brown fox", 32.0).draw_at(10, 110));
-            buffer.draw(
-                font.rasterize("jumps over the lazy dog.", 32.0)
-                    .draw_at(10, 138),
-            );
+            buffer.draw(font.rasterize("The quick brown fox", 32.0).draw_at(
+                10,
+                110,
+                Backend::BLACK,
+                Backend::WHITE,
+            ));
+            buffer.draw(font.rasterize("jumps over the lazy dog.", 32.0).draw_at(
+                10,
+                138,
+                Backend::BLACK,
+                Backend::WHITE,
+            ));
 
-            buffer.draw(font.rasterize("The quick brown", 48.0).draw_at(10, 184));
-            buffer.draw(font.rasterize("fox jumps over", 48.0).draw_at(10, 230));
-            buffer.draw(font.rasterize("the lazy dog.", 48.0).draw_at(10, 276));
+            buffer.draw(font.rasterize("The quick brown", 48.0).draw_at(
+                10,
+                184,
+                Backend::BLACK,
+                Backend::WHITE,
+            ));
+            buffer.draw(font.rasterize("fox jumps over", 48.0).draw_at(
+                10,
+                230,
+                Backend::BLACK,
+                Backend::WHITE,
+            ));
+            buffer.draw(font.rasterize("the lazy dog.", 48.0).draw_at(
+                10,
+                276,
+                Backend::BLACK,
+                Backend::WHITE,
+            ));
         }
 
         backend.show_buffer()?;

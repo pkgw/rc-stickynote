@@ -4,6 +4,10 @@
 //! simulator](https://github.com/jamwaffles/embedded-graphics/tree/master/simulator)
 //! provided with the
 //! [embedded-graphics](https://crates.io/crates/embedded-graphics) crate.
+//!
+//! TODO: the From<u8> behavior of this could be changed to exactly match that
+//! of waveshare-epd, in which only 0 and 1 are valid inputs and (IIRC) 1 is
+//! white.
 
 // To minimize differences with upstream, we keep in a few features that we
 // don't use, so:
@@ -81,6 +85,7 @@ impl Display {
         false
     }
 
+    /// XXX new method for rpi-epd-panel:
     pub fn fill(&mut self, color: SimPixelColor) {
         for p in self.pixels.iter_mut() {
             *p = color;

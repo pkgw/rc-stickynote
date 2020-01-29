@@ -7,7 +7,6 @@
 
 use embedded_graphics::{pixelcolor::PixelColor, prelude::*};
 use rusttype::{point, Font, PositionedGlyph, Scale};
-use std::marker::PhantomData;
 
 /// A convenience extension trait to help with rasterizing a rusttype font
 /// into an embedded-graphics Drawing.
@@ -70,19 +69,32 @@ pub struct Layout {
 impl Layout {
     /// Represent this rasterization as a pixel iterator suitable for
     /// consumption by `embedded_graphics::Drawing::draw()`.
-    pub fn draw_at<'a, C: PixelColor>(&'a self, x0: usize, y0: usize) -> LayoutPixelIter<'a, C> {
+    pub fn draw_at<'a, C: PixelColor>(
+        &'a self,
+        x0: usize,
+        y0: usize,
+        fg: C,
+        bg: C,
+    ) -> LayoutPixelIter<'a, C> {
         LayoutPixelIter {
             layout: self,
             x0,
             y0,
             ix: 0,
             iy: 0,
-            _phantom: PhantomData,
+            fg,
+            bg,
         }
     }
 }
 
 /// An iterator over pixels in a Layout.
+///
+/// While PixelColor is defined to implement From<u8>, the waveshare-epd
+/// implementation only wants inputs of 0 and 1, and they have different
+/// polarity than what my simulator expects. So we have the iterator carry
+/// around the `fg` and `bg` colors rather than converting the u8 values in
+/// `layout.buf` directly.
 #[derive(Debug)]
 pub struct LayoutPixelIter<'a, C> {
     layout: &'a Layout,
@@ -90,7 +102,8 @@ pub struct LayoutPixelIter<'a, C> {
     y0: usize,
     ix: usize,
     iy: usize,
-    _phantom: PhantomData<C>,
+    fg: C,
+    bg: C,
 }
 
 impl<'a, C: PixelColor> Iterator for LayoutPixelIter<'a, C> {
@@ -103,7 +116,12 @@ impl<'a, C: PixelColor> Iterator for LayoutPixelIter<'a, C> {
 
         let rx = (self.x0 + self.ix) as u32;
         let ry = (self.y0 + self.iy) as u32;
-        let rc = self.layout.buf[self.ix + self.iy * self.layout.width].into();
+
+        let rc = if self.layout.buf[self.ix + self.iy * self.layout.width] > 0 {
+            self.fg
+        } else {
+            self.bg
+        };
 
         self.ix += 1;
 

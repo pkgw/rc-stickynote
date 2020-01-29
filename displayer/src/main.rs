@@ -1,13 +1,7 @@
 //! The program that renders information to the e-Print Display. (Or a
 //! simulated version thereof.)
 
-use embedded_graphics::{
-    coord::Coord,
-    fonts::{Font12x16, Font6x8},
-    prelude::*,
-    primitives::{Circle, Line},
-    Drawing,
-};
+use embedded_graphics::{coord::Coord, fonts::Font6x8, prelude::*, Drawing};
 use rusttype::FontCollection;
 use std::{
     fs::File,

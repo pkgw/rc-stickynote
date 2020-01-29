@@ -8,7 +8,14 @@ use embedded_graphics::{
     primitives::{Circle, Line},
     Drawing,
 };
-use std::{io::Error, thread, time::Duration};
+use rusttype::FontCollection;
+use std::{
+    fs::File,
+    io::{Error, Read},
+    path::PathBuf,
+    thread,
+    time::Duration,
+};
 use structopt::StructOpt;
 
 #[cfg(feature = "waveshare")]
@@ -20,6 +27,9 @@ use epd7in5::EPD7in5Backend as Backend;
 mod simulator;
 #[cfg(feature = "simulator")]
 use simulator::SimulatorBackend as Backend;
+
+mod text;
+use text::DrawFontExt;
 
 trait DisplayBackend: Sized {
     type Color: embedded_graphics::pixelcolor::PixelColor;
@@ -46,6 +56,60 @@ impl ClearAndSleepCommand {
         let mut backend = Backend::open()?;
         backend.clear_display()?;
         backend.sleep_device()?;
+        Ok(())
+    }
+}
+
+// demo-font subcommand
+
+#[derive(Debug, StructOpt)]
+pub struct DemoFontCommand {
+    #[structopt(help = "The path to a TTF or OTF font file.")]
+    font_path: PathBuf,
+}
+
+impl DemoFontCommand {
+    fn cli(self) -> Result<(), Error> {
+        let mut file = File::open(&self.font_path)?;
+        let mut font_data = Vec::new();
+        file.read_to_end(&mut font_data)?;
+
+        let collection = FontCollection::from_bytes(font_data)?;
+        let font = collection.into_font()?; // only succeeds if collection consists of one font
+
+        let mut backend = Backend::open()?;
+
+        {
+            let buffer = backend.get_buffer_mut();
+
+            buffer.draw(
+                font.rasterize("The quick brown fox jumps over the lazy dog.", 10.0)
+                    .draw_at(10, 10),
+            );
+
+            buffer.draw(
+                font.rasterize("The quick brown fox jumps over the lazy dog.", 14.0)
+                    .draw_at(10, 30),
+            );
+
+            buffer.draw(font.rasterize("The quick brown fox", 20.0).draw_at(10, 58));
+            buffer.draw(
+                font.rasterize("jumps over the lazy dog.", 20.0)
+                    .draw_at(10, 80),
+            );
+
+            buffer.draw(font.rasterize("The quick brown fox", 32.0).draw_at(10, 110));
+            buffer.draw(
+                font.rasterize("jumps over the lazy dog.", 32.0)
+                    .draw_at(10, 138),
+            );
+
+            buffer.draw(font.rasterize("The quick brown", 48.0).draw_at(10, 184));
+            buffer.draw(font.rasterize("fox jumps over", 48.0).draw_at(10, 230));
+            buffer.draw(font.rasterize("the lazy dog.", 48.0).draw_at(10, 276));
+        }
+
+        backend.show_buffer()?;
         Ok(())
     }
 }
@@ -137,6 +201,10 @@ enum RootCli {
     /// Clear the display and sleep the device
     ClearAndSleep(ClearAndSleepCommand),
 
+    #[structopt(name = "demo-font")]
+    /// Render a TrueType font at various sizes.
+    DemoFont(DemoFontCommand),
+
     #[structopt(name = "show-ips")]
     /// Show IP addresses on the display
     ShowIps(ShowIpsCommand),
@@ -146,6 +214,7 @@ impl RootCli {
     fn cli(self) -> Result<(), Error> {
         match self {
             RootCli::ClearAndSleep(opts) => opts.cli(),
+            RootCli::DemoFont(opts) => opts.cli(),
             RootCli::ShowIps(opts) => opts.cli(),
         }
     }

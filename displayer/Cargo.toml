@@ -13,8 +13,16 @@ waveshare = ["epd-waveshare"]
 embedded-graphics = "^0.5"
 embedded-hal = { version = "^0.2", features = ["unproven"] }
 epd-waveshare = { git = "https://github.com/caemor/epd-waveshare", branch = "master", features = ["epd7in5", "graphics"], optional = true }
+futures = "^0.3"
 get_if_addrs = "^0.5"
 linux-embedded-hal = "0.2"
+protocol = { version = "0.1.0", path = "../protocol" }
 rusttype = "^0.8"
 sdl2 = { version = "0.31", optional = true }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "^1.0"
 structopt = "0.3"
+tokio = { version = "0.2", features = ["full"] }
+tokio-serde = { version = "^0.6", features = ["json"] }
+tokio-util = { version = "0.2.0", features = ["codec"] }
+toml = "^0.5"

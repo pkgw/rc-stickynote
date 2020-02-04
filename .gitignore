@@ -1,3 +1,5 @@
 /.vagrant/
 /*-cloudimg-console.log
+/Cargo.lock
 /semi-pi-gen/deploy/
+/target/

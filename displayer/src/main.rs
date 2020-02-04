@@ -22,6 +22,7 @@ mod simulator;
 #[cfg(feature = "simulator")]
 use simulator::SimulatorBackend as Backend;
 
+mod client;
 mod text;
 use text::DrawFontExt;
 
@@ -51,6 +52,19 @@ impl ClearAndSleepCommand {
         backend.clear_display()?;
         backend.sleep_device()?;
         Ok(())
+    }
+}
+
+// client subcommand
+
+#[derive(Debug, StructOpt)]
+pub struct ClientCommand {
+    config_path: PathBuf,
+}
+
+impl ClientCommand {
+    fn cli(self) -> Result<(), Error> {
+        client::cli(self)
     }
 }
 
@@ -224,6 +238,10 @@ enum RootCli {
     /// Clear the display and sleep the device
     ClearAndSleep(ClearAndSleepCommand),
 
+    #[structopt(name = "client")]
+    /// Launch a client that connects to a hub and drives the display.
+    Client(ClientCommand),
+
     #[structopt(name = "demo-font")]
     /// Render a TrueType font at various sizes.
     DemoFont(DemoFontCommand),
@@ -237,6 +255,7 @@ impl RootCli {
     fn cli(self) -> Result<(), Error> {
         match self {
             RootCli::ClearAndSleep(opts) => opts.cli(),
+            RootCli::Client(opts) => opts.cli(),
             RootCli::DemoFont(opts) => opts.cli(),
             RootCli::ShowIps(opts) => opts.cli(),
         }

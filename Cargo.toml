@@ -1,0 +1,5 @@
+# Copyright 2020 Peter Williams <peter@newton.cx> and collaborators
+# Licensed under the MIT License.
+
+[workspace]
+members = ["displayer", "hub", "protocol"]

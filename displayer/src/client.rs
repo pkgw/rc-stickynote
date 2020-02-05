@@ -1,6 +1,6 @@
 //! The long-running panel driving client.
 
-use futures::prelude::*;
+use futures::{prelude::*, select};
 use protocol::HelloMessage;
 use serde::Deserialize;
 use std::{
@@ -39,20 +39,23 @@ pub fn cli(opts: super::ClientCommand) -> Result<(), Error> {
         let mut jsonwrite = SymmetricallyFramed::new(ldwrite, SymmetricalJson::default());
 
         // Say hello.
-
         jsonwrite.send(HelloMessage { a_number: 123 }).await?;
 
         loop {
-            let msg: Result<Option<protocol::DisplayMessage>, _> = jsonread.try_next().await;
+            select! {
+                msg = jsonread.try_next().fuse() => {
+                    { let _type_inference: &Result<Option<protocol::DisplayMessage>, _> = &msg; }
 
-            match msg {
-                Ok(Some(m)) => {
-                    println!("msg: {:?}", m);
-                },
+                    match msg {
+                        Ok(Some(m)) => {
+                            println!("msg: {:?}", m);
+                        },
 
-                Ok(None) => break,
+                        Ok(None) => break,
 
-                Err(err) => return Err(err),
+                        Err(err) => return Err(err),
+                    }
+                }
             }
         }
 

@@ -7,7 +7,7 @@ use std::{
     fs::File,
     io::{Error, Read},
 };
-use tokio::{net::TcpStream, runtime::Runtime};
+use tokio::{net::TcpStream, runtime::Runtime, time::{self, Duration}};
 use tokio_serde::{formats::SymmetricalJson, SymmetricallyFramed};
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 use toml;
@@ -41,6 +41,8 @@ pub fn cli(opts: super::ClientCommand) -> Result<(), Error> {
         // Say hello.
         jsonwrite.send(HelloMessage { a_number: 123 }).await?;
 
+        let mut interval = time::interval(Duration::from_millis(1_000));
+
         loop {
             select! {
                 msg = jsonread.try_next().fuse() => {
@@ -55,6 +57,10 @@ pub fn cli(opts: super::ClientCommand) -> Result<(), Error> {
 
                         Err(err) => return Err(err),
                     }
+                }
+
+                _ = interval.tick().fuse() => {
+                    println!("tick");
                 }
             }
         }

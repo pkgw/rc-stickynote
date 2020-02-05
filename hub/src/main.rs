@@ -3,7 +3,7 @@
 use futures::prelude::*;
 use protocol;
 use std::io::Error;
-use tokio::{net::{TcpListener, TcpStream}, prelude::*};
+use tokio::{net::{TcpListener, TcpStream}, time::{self, Duration}};
 use tokio_serde::{formats::SymmetricalJson, SymmetricallyFramed};
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
@@ -55,14 +55,23 @@ fn handle_new_connection(mut socket: TcpStream) -> Result<(), Error> {
                 println!("GOT OK HELLO");
             },
 
-            Some(Err(e)) => return Err(e),
+            Some(err) => return err,
 
             None => panic!("no hello PANIC BAD"),
         }
 
         jsonwrite.send(protocol::DisplayMessage { message: "hello".to_owned() }).await?;
 
-        Ok(())
+        let mut interval = time::interval(Duration::from_millis(10_000));
+        let mut tick = 0usize;
+
+        loop {
+            interval.tick().await;
+            jsonwrite.send(protocol::DisplayMessage {
+                message: format!("tick {}", tick),
+            }).await?;
+            tick += 1;
+        }
     });
 
     Ok(())

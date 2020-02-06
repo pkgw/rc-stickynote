@@ -3,6 +3,7 @@
 use embedded_graphics::{
     coord::Coord,
     fonts::{Font, Font6x8},
+    pixelcolor::PixelColor,
     style::{Style, WithStyle},
     transform::Transform,
     Drawing,
@@ -65,17 +66,21 @@ pub fn cli(opts: super::ClientCommand) -> Result<(), Error> {
 
         let mut interval = time::interval(Duration::from_millis(15_000));
 
+        let mut display_data = DisplayData::new()?;
+
         loop {
+            // `select` on various things that might motivate us to update the
+            // display.
+
             select! {
+                // New message from the hub.
                 msg = jsonread.try_next().fuse() => {
                     { let _type_inference: &Result<Option<protocol::DisplayMessage>, _> = &msg; }
 
                     match msg {
                         Ok(Some(m)) => {
                             println!("msg: {:?}", m);
-                            if sender.send(m).is_err() {
-                                return Err(Error::new(std::io::ErrorKind::Other, "display thread died?!"));
-                            }
+                            display_data.scientist_is = m.message;
                         },
 
                         Ok(None) => break,
@@ -84,9 +89,16 @@ pub fn cli(opts: super::ClientCommand) -> Result<(), Error> {
                     }
                 }
 
+                // Time has passed since the last interval tick.
                 _ = interval.tick().fuse() => {
-                    println!("tick");
+                    println!("local tick");
+                    display_data.update_local()?;
                 }
+            }
+
+            // Send the current state over to the display thread!
+            if sender.send(display_data.clone()).is_err() {
+                return Err(Error::new(std::io::ErrorKind::Other, "display thread died?!"));
             }
         }
 
@@ -94,7 +106,7 @@ pub fn cli(opts: super::ClientCommand) -> Result<(), Error> {
     })
 }
 
-fn renderer_thread(receiver: Receiver<protocol::DisplayMessage>) -> Result<(), std::io::Error> {
+fn renderer_thread(receiver: Receiver<DisplayData>) -> Result<(), std::io::Error> {
     // Note that Backend is not Send, so we have to open it up in this thread.
     let mut backend = Backend::open()?;
 
@@ -104,14 +116,14 @@ fn renderer_thread(receiver: Receiver<protocol::DisplayMessage>) -> Result<(), s
         // this way our thread can be woken up immediately when a new
         // message arrives.
 
-        let mut msg = match receiver.recv() {
-            Ok(m) => m,
+        let mut display_data = match receiver.recv() {
+            Ok(dd) => dd,
             Err(_) => break,
         };
 
         loop {
             match receiver.try_recv() {
-                Ok(m) => msg = m,
+                Ok(dd) => display_data = dd,
 
                 // This error might be that the queue is empty, or that the
                 // sender has disconnectd. If the latter, the error will come
@@ -121,23 +133,69 @@ fn renderer_thread(receiver: Receiver<protocol::DisplayMessage>) -> Result<(), s
             };
         }
 
-        {
-            let buffer = backend.get_buffer_mut();
+        // Draw. Keep in mind that on the actual device, this takes more than
+        // 10 seconds!
 
-            buffer.draw(
-                Font6x8::render_str(&msg.message)
-                    .style(Style {
-                        fill_color: Some(Backend::WHITE),
-                        stroke_color: Some(Backend::BLACK),
-                        stroke_width: 0u8, // Has no effect on fonts
-                    })
-                    .translate(Coord::new(50, 50))
-                    .into_iter(),
-            );
-        }
-
+        display_data.draw(backend.get_buffer_mut(), Backend::WHITE, Backend::BLACK);
         backend.show_buffer()?;
     }
 
     Ok(())
+}
+
+
+#[derive(Clone, Debug)]
+struct DisplayData {
+    scientist_is: String,
+    ip_addr: String,
+}
+
+impl DisplayData {
+    fn new() -> Result<Self, std::io::Error> {
+        let mut dd = DisplayData {
+            scientist_is: "???".to_owned(),
+            ip_addr: "".to_owned(),
+        };
+        dd.update_local()?;
+        Ok(dd)
+    }
+
+    fn update_local(&mut self) -> Result<(), std::io::Error> {
+        self.ip_addr = "???.???.???.???".to_owned();
+
+        for iface in &get_if_addrs::get_if_addrs()? {
+            if !iface.is_loopback() {
+                if let get_if_addrs::IfAddr::V4(ref addr) = iface.addr {
+                    self.ip_addr = addr.ip.to_string();
+                    break;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn draw<C: PixelColor, T: Drawing<C>>(&self, buffer: &mut T, white: C, black: C) {
+        buffer.draw(
+            Font6x8::render_str(&self.scientist_is)
+                .style(Style {
+                    fill_color: Some(white),
+                    stroke_color: Some(black),
+                    stroke_width: 0u8, // Has no effect on fonts
+                })
+                .translate(Coord::new(50, 50))
+                .into_iter(),
+        );
+
+        buffer.draw(
+            Font6x8::render_str(&self.ip_addr)
+                .style(Style {
+                    fill_color: Some(white),
+                    stroke_color: Some(black),
+                    stroke_width: 0u8, // Has no effect on fonts
+                })
+                .translate(Coord::new(50, 100))
+                .into_iter(),
+        );
+    }
 }

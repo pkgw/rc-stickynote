@@ -3,7 +3,10 @@
 use futures::prelude::*;
 use protocol;
 use std::io::Error;
-use tokio::{net::{TcpListener, TcpStream}, time::{self, Duration}};
+use tokio::{
+    net::{TcpListener, TcpStream},
+    time::{self, Duration},
+};
 use tokio_serde::{formats::SymmetricalJson, SymmetricallyFramed};
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
@@ -18,10 +21,10 @@ async fn main() {
         while let Some(socket_res) = incoming.next().await {
             match socket_res {
                 Ok(socket) => match handle_new_connection(socket) {
-                    Ok(_) => {},
+                    Ok(_) => {}
                     Err(e) => {
                         println!("error while setting up new connection: {:?}", e);
-                    },
+                    }
                 },
 
                 Err(err) => {
@@ -53,23 +56,29 @@ fn handle_new_connection(mut socket: TcpStream) -> Result<(), Error> {
             Some(Ok(_)) => {
                 // don't care about contents right now
                 println!("GOT OK HELLO");
-            },
+            }
 
             Some(err) => return err,
 
             None => panic!("no hello PANIC BAD"),
         }
 
-        jsonwrite.send(protocol::DisplayMessage { message: "hello".to_owned() }).await?;
+        jsonwrite
+            .send(protocol::DisplayMessage {
+                message: "hello".to_owned(),
+            })
+            .await?;
 
         let mut interval = time::interval(Duration::from_millis(10_000));
         let mut tick = 0usize;
 
         loop {
             interval.tick().await;
-            jsonwrite.send(protocol::DisplayMessage {
-                message: format!("tick {}", tick),
-            }).await?;
+            jsonwrite
+                .send(protocol::DisplayMessage {
+                    message: format!("tick {}", tick),
+                })
+                .await?;
             tick += 1;
         }
     });

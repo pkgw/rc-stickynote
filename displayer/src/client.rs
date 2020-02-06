@@ -4,13 +4,13 @@ use chrono::prelude::*;
 use embedded_graphics::{
     coord::Coord,
     fonts::{Font, Font6x8},
-    pixelcolor::PixelColor,
     style::{Style, WithStyle},
     transform::Transform,
     Drawing,
 };
 use futures::{prelude::*, select};
 use protocol::HelloMessage;
+use rusttype::FontCollection;
 use serde::Deserialize;
 use std::{
     fs::File,
@@ -27,12 +27,14 @@ use tokio_serde::{formats::SymmetricalJson, SymmetricallyFramed};
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 use toml;
 
+use crate::text::DrawFontExt;
 use super::{Backend, DisplayBackend};
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 struct ClientConfiguration {
     hub_host: String,
     hub_port: u16,
+    sans_path: String,
 }
 
 pub fn cli(opts: super::ClientCommand) -> Result<(), Error> {
@@ -49,7 +51,8 @@ pub fn cli(opts: super::ClientCommand) -> Result<(), Error> {
 
     // The actual renderer operates in its own thread since the I/O can be slow
     // and we don't want to block the async runtime.
-    thread::spawn(move || renderer_thread(receiver));
+    let cloned_config = config.clone();
+    thread::spawn(move || renderer_thread(cloned_config, receiver));
 
     let mut rt = Runtime::new()?;
 
@@ -107,9 +110,17 @@ pub fn cli(opts: super::ClientCommand) -> Result<(), Error> {
     })
 }
 
-fn renderer_thread(receiver: Receiver<DisplayData>) -> Result<(), std::io::Error> {
+fn renderer_thread(config: ClientConfiguration, receiver: Receiver<DisplayData>) -> Result<(), std::io::Error> {
     // Note that Backend is not Send, so we have to open it up in this thread.
     let mut backend = Backend::open()?;
+
+    let sans_font = {
+        let mut file = File::open(&config.sans_path)?;
+        let mut font_data = Vec::new();
+        file.read_to_end(&mut font_data)?;
+        let collection = FontCollection::from_bytes(font_data)?;
+        collection.into_font()?
+    };
 
     loop {
         // Zip through the channel until we find the very latest message.
@@ -117,14 +128,14 @@ fn renderer_thread(receiver: Receiver<DisplayData>) -> Result<(), std::io::Error
         // this way our thread can be woken up immediately when a new
         // message arrives.
 
-        let mut display_data = match receiver.recv() {
+        let mut dd = match receiver.recv() {
             Ok(dd) => dd,
             Err(_) => break,
         };
 
         loop {
             match receiver.try_recv() {
-                Ok(dd) => display_data = dd,
+                Ok(new_dd) => dd = new_dd,
 
                 // This error might be that the queue is empty, or that the
                 // sender has disconnectd. If the latter, the error will come
@@ -137,7 +148,39 @@ fn renderer_thread(receiver: Receiver<DisplayData>) -> Result<(), std::io::Error
         // Draw. Keep in mind that on the actual device, this takes more than
         // 10 seconds!
 
-        display_data.draw(backend.get_buffer_mut(), Backend::WHITE, Backend::BLACK);
+        {
+            let buffer = backend.get_buffer_mut();
+
+            let now = dd.now.format("%I:%M %p").to_string();
+
+            buffer.draw(sans_font.rasterize(&now, 48.0).draw_at(
+                50, 50,
+                Backend::BLACK, Backend::WHITE,
+            ));
+
+            buffer.draw(
+                Font6x8::render_str(&dd.scientist_is)
+                    .style(Style {
+                        fill_color: Some(Backend::WHITE),
+                        stroke_color: Some(Backend::BLACK),
+                        stroke_width: 0u8, // Has no effect on fonts
+                    })
+                    .translate(Coord::new(50, 100))
+                    .into_iter(),
+            );
+
+            buffer.draw(
+                Font6x8::render_str(&dd.ip_addr)
+                    .style(Style {
+                        fill_color: Some(Backend::WHITE),
+                        stroke_color: Some(Backend::BLACK),
+                        stroke_width: 0u8, // Has no effect on fonts
+                    })
+                    .translate(Coord::new(50, 150))
+                    .into_iter(),
+            );
+        }
+
         backend.show_buffer()?;
     }
 
@@ -147,9 +190,9 @@ fn renderer_thread(receiver: Receiver<DisplayData>) -> Result<(), std::io::Error
 
 #[derive(Clone, Debug)]
 struct DisplayData {
-    now: DateTime<Local>,
-    scientist_is: String,
-    ip_addr: String,
+    pub now: DateTime<Local>,
+    pub scientist_is: String,
+    pub ip_addr: String,
 }
 
 impl DisplayData {
@@ -178,42 +221,5 @@ impl DisplayData {
         }
 
         Ok(())
-    }
-
-    fn draw<C: PixelColor, T: Drawing<C>>(&self, buffer: &mut T, white: C, black: C) {
-        let now = self.now.format("%I:%M %p").to_string();
-
-        buffer.draw(
-            Font6x8::render_str(&now)
-                .style(Style {
-                    fill_color: Some(white),
-                    stroke_color: Some(black),
-                    stroke_width: 0u8, // Has no effect on fonts
-                })
-                .translate(Coord::new(50, 50))
-                .into_iter(),
-        );
-
-        buffer.draw(
-            Font6x8::render_str(&self.scientist_is)
-                .style(Style {
-                    fill_color: Some(white),
-                    stroke_color: Some(black),
-                    stroke_width: 0u8, // Has no effect on fonts
-                })
-                .translate(Coord::new(50, 100))
-                .into_iter(),
-        );
-
-        buffer.draw(
-            Font6x8::render_str(&self.ip_addr)
-                .style(Style {
-                    fill_color: Some(white),
-                    stroke_color: Some(black),
-                    stroke_width: 0u8, // Has no effect on fonts
-                })
-                .translate(Coord::new(50, 150))
-                .into_iter(),
-        );
     }
 }

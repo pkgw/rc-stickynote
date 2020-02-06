@@ -99,10 +99,27 @@ fn renderer_thread(receiver: Receiver<protocol::DisplayMessage>) -> Result<(), s
     let mut backend = Backend::open()?;
 
     loop {
-        let msg = match receiver.recv() {
+        // Zip through the channel until we find the very latest message.
+        // We might be able to do this with a mutex on a scalar value, but
+        // this way our thread can be woken up immediately when a new
+        // message arrives.
+
+        let mut msg = match receiver.recv() {
             Ok(m) => m,
             Err(_) => break,
         };
+
+        loop {
+            match receiver.try_recv() {
+                Ok(m) => msg = m,
+
+                // This error might be that the queue is empty, or that the
+                // sender has disconnectd. If the latter, the error will come
+                // up again in the next iteration, so we can actually handle
+                // these two possibilities in the same way.
+                Err(_) => break,
+            };
+        }
 
         {
             let buffer = backend.get_buffer_mut();

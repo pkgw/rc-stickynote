@@ -1,5 +1,6 @@
 //! The long-running panel driving client.
 
+use chrono::prelude::*;
 use embedded_graphics::{
     coord::Coord,
     fonts::{Font, Font6x8},
@@ -146,6 +147,7 @@ fn renderer_thread(receiver: Receiver<DisplayData>) -> Result<(), std::io::Error
 
 #[derive(Clone, Debug)]
 struct DisplayData {
+    now: DateTime<Local>,
     scientist_is: String,
     ip_addr: String,
 }
@@ -153,6 +155,7 @@ struct DisplayData {
 impl DisplayData {
     fn new() -> Result<Self, std::io::Error> {
         let mut dd = DisplayData {
+            now: Local::now(),
             scientist_is: "???".to_owned(),
             ip_addr: "".to_owned(),
         };
@@ -161,6 +164,8 @@ impl DisplayData {
     }
 
     fn update_local(&mut self) -> Result<(), std::io::Error> {
+        self.now = Local::now();
+
         self.ip_addr = "???.???.???.???".to_owned();
 
         for iface in &get_if_addrs::get_if_addrs()? {
@@ -176,8 +181,10 @@ impl DisplayData {
     }
 
     fn draw<C: PixelColor, T: Drawing<C>>(&self, buffer: &mut T, white: C, black: C) {
+        let now = self.now.format("%I:%M %p").to_string();
+
         buffer.draw(
-            Font6x8::render_str(&self.scientist_is)
+            Font6x8::render_str(&now)
                 .style(Style {
                     fill_color: Some(white),
                     stroke_color: Some(black),
@@ -188,13 +195,24 @@ impl DisplayData {
         );
 
         buffer.draw(
-            Font6x8::render_str(&self.ip_addr)
+            Font6x8::render_str(&self.scientist_is)
                 .style(Style {
                     fill_color: Some(white),
                     stroke_color: Some(black),
                     stroke_width: 0u8, // Has no effect on fonts
                 })
                 .translate(Coord::new(50, 100))
+                .into_iter(),
+        );
+
+        buffer.draw(
+            Font6x8::render_str(&self.ip_addr)
+                .style(Style {
+                    fill_color: Some(white),
+                    stroke_color: Some(black),
+                    stroke_width: 0u8, // Has no effect on fonts
+                })
+                .translate(Coord::new(50, 150))
                 .into_iter(),
         );
     }

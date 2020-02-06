@@ -10,6 +10,7 @@ simulator = ["sdl2"]
 waveshare = ["epd-waveshare"]
 
 [dependencies]
+chrono = "^0.4"
 embedded-graphics = "^0.5"
 embedded-hal = { version = "^0.2", features = ["unproven"] }
 epd-waveshare = { git = "https://github.com/caemor/epd-waveshare", branch = "master", features = ["epd7in5", "graphics"], optional = true }

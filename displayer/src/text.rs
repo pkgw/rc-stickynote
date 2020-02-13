@@ -69,19 +69,24 @@ pub struct Layout {
 impl Layout {
     /// Represent this rasterization as a pixel iterator suitable for
     /// consumption by `embedded_graphics::Drawing::draw()`.
+    ///
+    /// If some of the text falls at `x < 0` or `y < 0`, it will be clipped.
     pub fn draw_at<'a, C: PixelColor>(
         &'a self,
-        x0: usize,
-        y0: usize,
+        x0: i32,
+        y0: i32,
         fg: C,
         bg: C,
     ) -> LayoutPixelIter<'a, C> {
+        let ix = if x0 < 0 { -x0 } else { 0 } as usize;
+        let iy = if y0 < 0 { -y0 } else { 0 } as usize;
+
         LayoutPixelIter {
             layout: self,
             x0,
             y0,
-            ix: 0,
-            iy: 0,
+            ix,
+            iy,
             fg,
             bg,
         }
@@ -98,8 +103,8 @@ impl Layout {
 #[derive(Debug)]
 pub struct LayoutPixelIter<'a, C> {
     layout: &'a Layout,
-    x0: usize,
-    y0: usize,
+    x0: i32,
+    y0: i32,
     ix: usize,
     iy: usize,
     fg: C,
@@ -114,8 +119,8 @@ impl<'a, C: PixelColor> Iterator for LayoutPixelIter<'a, C> {
             return None;
         }
 
-        let rx = (self.x0 + self.ix) as u32;
-        let ry = (self.y0 + self.iy) as u32;
+        let rx = (self.x0 as usize + self.ix) as u32;
+        let ry = (self.y0 as usize + self.iy) as u32;
 
         let rc = if self.layout.buf[self.ix + self.iy * self.layout.width] > 0 {
             self.fg
@@ -126,7 +131,7 @@ impl<'a, C: PixelColor> Iterator for LayoutPixelIter<'a, C> {
         self.ix += 1;
 
         if self.ix >= self.layout.width {
-            self.ix = 0;
+            self.ix = if self.x0 < 0 { -self.x0 as usize } else { 0 };
             self.iy += 1;
         }
 

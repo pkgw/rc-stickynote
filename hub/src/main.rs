@@ -69,7 +69,7 @@ fn handle_new_connection(mut socket: TcpStream) -> Result<(), Error> {
             })
             .await?;
 
-        let mut interval = time::interval(Duration::from_millis(10_000));
+        let mut interval = time::interval(Duration::from_millis(60_000));
         let mut tick = 0usize;
 
         loop {

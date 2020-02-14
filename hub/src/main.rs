@@ -74,11 +74,16 @@ fn handle_new_connection(mut socket: TcpStream) -> Result<(), Error> {
 
         loop {
             interval.tick().await;
-            jsonwrite
-                .send(protocol::DisplayMessage {
-                    message: format!("tick {}", tick),
-                })
-                .await?;
+
+            // temporary demo hack
+            let message = if tick % 2 == 0 {
+                "in"
+            } else {
+                "getting coffee"
+            }
+            .to_owned();
+
+            jsonwrite.send(protocol::DisplayMessage { message }).await?;
             tick += 1;
         }
     });

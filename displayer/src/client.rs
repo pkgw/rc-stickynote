@@ -70,7 +70,7 @@ pub fn cli(opts: super::ClientCommand) -> Result<(), Error> {
         // Say hello.
         jsonwrite.send(HelloMessage { a_number: 123 }).await?;
 
-        let mut interval = time::interval(Duration::from_millis(15_000));
+        let mut interval = time::interval(Duration::from_millis(600_000));
 
         let mut display_data = DisplayData::new()?;
 

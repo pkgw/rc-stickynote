@@ -3,6 +3,7 @@
 use futures::prelude::*;
 use protocol;
 use std::io::Error;
+use structopt::StructOpt;
 use tokio::{
     net::{TcpListener, TcpStream},
     time::{self, Duration},
@@ -10,35 +11,42 @@ use tokio::{
 use tokio_serde::{formats::SymmetricalJson, SymmetricallyFramed};
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
-#[tokio::main]
-async fn main() {
-    let addr = "127.0.0.1:20200";
-    let mut listener = TcpListener::bind(addr).await.unwrap();
+// "serve" subcommand
 
-    let server = async move {
-        let mut incoming = listener.incoming();
+#[derive(Debug, StructOpt)]
+pub struct ServeCommand {}
 
-        while let Some(socket_res) = incoming.next().await {
-            match socket_res {
-                Ok(socket) => match handle_new_connection(socket) {
-                    Ok(_) => {}
-                    Err(e) => {
-                        println!("error while setting up new connection: {:?}", e);
+impl ServeCommand {
+    async fn cli(self) -> Result<(), Error> {
+        let addr = "127.0.0.1:20200";
+        let mut listener = TcpListener::bind(addr).await.unwrap();
+
+        let server = async move {
+            let mut incoming = listener.incoming();
+
+            while let Some(socket_res) = incoming.next().await {
+                match socket_res {
+                    Ok(socket) => match handle_new_connection(socket) {
+                        Ok(_) => {}
+                        Err(e) => {
+                            println!("error while setting up new connection: {:?}", e);
+                        }
+                    },
+
+                    Err(err) => {
+                        // Handle error by printing to STDOUT.
+                        println!("accept error = {:?}", err);
                     }
-                },
-
-                Err(err) => {
-                    // Handle error by printing to STDOUT.
-                    println!("accept error = {:?}", err);
                 }
             }
-        }
-    };
+        };
 
-    println!("Server running on {}", addr);
+        println!("Server running on {}", addr);
 
-    // Start the server and block this async fn until `server` spins down.
-    server.await;
+        // Start the server and block this async fn until `server` spins down.
+        server.await;
+        Ok(())
+    }
 }
 
 fn handle_new_connection(mut socket: TcpStream) -> Result<(), Error> {
@@ -89,4 +97,43 @@ fn handle_new_connection(mut socket: TcpStream) -> Result<(), Error> {
     });
 
     Ok(())
+}
+
+// "twitter-login" subcommand
+
+#[derive(Debug, StructOpt)]
+pub struct TwitterLoginCommand {}
+
+impl TwitterLoginCommand {
+    async fn cli(self) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+// CLI root interface
+
+#[derive(Debug, StructOpt)]
+#[structopt(name = "hub", about = "RC Stickynote dispatch hub")]
+enum RootCli {
+    #[structopt(name = "serve")]
+    /// Launch the dispatch hub server.
+    Serve(ServeCommand),
+
+    #[structopt(name = "twitter-login")]
+    /// Login to the connected Twitter account
+    TwitterLogin(TwitterLoginCommand),
+}
+
+impl RootCli {
+    async fn cli(self) -> Result<(), Error> {
+        match self {
+            RootCli::Serve(opts) => opts.cli().await,
+            RootCli::TwitterLogin(opts) => opts.cli().await,
+        }
+    }
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Error> {
+    RootCli::from_args().cli().await
 }

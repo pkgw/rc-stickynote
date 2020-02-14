@@ -62,7 +62,7 @@ and a “display client” that runs on the RPi. Both are written in
 To build the hub, run:
 
 ```
-cargo build --bin hub --release
+cargo build --bin rc_stickynote_hub --release
 ```
 
 To cross-compile the display client for the RPi, install the Rust

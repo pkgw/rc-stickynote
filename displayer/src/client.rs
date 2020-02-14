@@ -4,6 +4,7 @@ use chrono::prelude::*;
 use embedded_graphics::{
     coord::Coord,
     fonts::{Font, Font6x8},
+    primitives::{Line, Rectangle},
     style::{Style, WithStyle},
     transform::Transform,
     Drawing,
@@ -27,14 +28,15 @@ use tokio_serde::{formats::SymmetricalJson, SymmetricallyFramed};
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 use toml;
 
-use crate::text::DrawFontExt;
 use super::{Backend, DisplayBackend};
+use crate::text::DrawFontExt;
 
 #[derive(Clone, Deserialize)]
 struct ClientConfiguration {
     hub_host: String,
     hub_port: u16,
     sans_path: String,
+    serif_path: String,
 }
 
 pub fn cli(opts: super::ClientCommand) -> Result<(), Error> {
@@ -102,7 +104,10 @@ pub fn cli(opts: super::ClientCommand) -> Result<(), Error> {
 
             // Send the current state over to the display thread!
             if sender.send(display_data.clone()).is_err() {
-                return Err(Error::new(std::io::ErrorKind::Other, "display thread died?!"));
+                return Err(Error::new(
+                    std::io::ErrorKind::Other,
+                    "display thread died?!",
+                ));
             }
         }
 
@@ -110,12 +115,23 @@ pub fn cli(opts: super::ClientCommand) -> Result<(), Error> {
     })
 }
 
-fn renderer_thread(config: ClientConfiguration, receiver: Receiver<DisplayData>) -> Result<(), std::io::Error> {
+fn renderer_thread(
+    config: ClientConfiguration,
+    receiver: Receiver<DisplayData>,
+) -> Result<(), std::io::Error> {
     // Note that Backend is not Send, so we have to open it up in this thread.
     let mut backend = Backend::open()?;
 
     let sans_font = {
         let mut file = File::open(&config.sans_path)?;
+        let mut font_data = Vec::new();
+        file.read_to_end(&mut font_data)?;
+        let collection = FontCollection::from_bytes(font_data)?;
+        collection.into_font()?
+    };
+
+    let serif_font = {
+        let mut file = File::open(&config.serif_path)?;
         let mut font_data = Vec::new();
         file.read_to_end(&mut font_data)?;
         let collection = FontCollection::from_bytes(font_data)?;
@@ -145,48 +161,110 @@ fn renderer_thread(config: ClientConfiguration, receiver: Receiver<DisplayData>)
             };
         }
 
-        // Draw. Keep in mind that on the actual device, this takes more than
-        // 10 seconds!
+        // Render into the buffer.
 
         {
             let buffer = backend.get_buffer_mut();
 
+            fn draw6x8(buf: &mut <Backend as DisplayBackend>::Buffer, s: &str, x: i32, y: i32) {
+                buf.draw(
+                    Font6x8::render_str(s)
+                        .style(Style {
+                            fill_color: Some(Backend::WHITE),
+                            stroke_color: Some(Backend::BLACK),
+                            stroke_width: 0u8, // Has no effect on fonts
+                        })
+                        .translate(Coord::new(x, y))
+                        .into_iter(),
+                );
+            }
+
+            // The clock
+
             let now = dd.now.format("%I:%M %p").to_string();
 
-            buffer.draw(sans_font.rasterize(&now, 48.0).draw_at(
-                50, 50,
-                Backend::BLACK, Backend::WHITE,
+            buffer.draw(sans_font.rasterize(&now, 56.0).draw_at(
+                2,
+                0,
+                Backend::BLACK,
+                Backend::WHITE,
             ));
 
-            buffer.draw(
-                Font6x8::render_str(&dd.scientist_is)
-                    .style(Style {
-                        fill_color: Some(Backend::WHITE),
-                        stroke_color: Some(Backend::BLACK),
-                        stroke_width: 0u8, // Has no effect on fonts
-                    })
-                    .translate(Coord::new(50, 100))
-                    .into_iter(),
-            );
+            let x = 230;
+            let y = 8;
+            let delta = 10;
+
+            draw6x8(buffer, "May be up to 15 minutes", x, y + 0 * delta);
+            draw6x8(buffer, "out of date. If much more", x, y + 1 * delta);
+            draw6x8(buffer, "than that, tell Peter his", x, y + 2 * delta);
+            draw6x8(buffer, "sign is broken.", x, y + 3 * delta);
+
+            // hline
 
             buffer.draw(
-                Font6x8::render_str(&dd.ip_addr)
-                    .style(Style {
-                        fill_color: Some(Backend::WHITE),
-                        stroke_color: Some(Backend::BLACK),
-                        stroke_width: 0u8, // Has no effect on fonts
-                    })
-                    .translate(Coord::new(50, 150))
-                    .into_iter(),
+                Line::new(Coord::new(0, 52), Coord::new(383, 52)).style(Style {
+                    fill_color: Some(Backend::BLACK),
+                    stroke_color: Some(Backend::BLACK),
+                    stroke_width: 1u8,
+                }),
             );
+
+            // "Scientist is ..."
+
+            let x = 8;
+            let y = 54;
+            let delta = 54;
+
+            buffer.draw(serif_font.rasterize("The Innovation", 64.0).draw_at(
+                x,
+                y,
+                Backend::BLACK,
+                Backend::WHITE,
+            ));
+
+            buffer.draw(serif_font.rasterize("Scientist is:", 64.0).draw_at(
+                x + 2,
+                y + delta,
+                Backend::BLACK,
+                Backend::WHITE,
+            ));
+
+            let y = y + 2 * delta + 12;
+            let delta = delta;
+
+            buffer.draw(
+                Rectangle::new(Coord::new(0, y), Coord::new(383, y + delta))
+                    .fill(Some(Backend::BLACK)),
+            );
+
+            let layout = sans_font.rasterize(&dd.scientist_is, 32.0);
+            let x = if layout.width as i32 > 384 {
+                0
+            } else {
+                (384 - layout.width as i32) / 2
+            };
+            let yofs = if layout.height as i32 > delta {
+                0
+            } else {
+                (delta - layout.height as i32) / 2
+            };
+
+            buffer.draw(layout.draw_at(x, y + yofs, Backend::WHITE, Backend::BLACK));
+
+            // IP address
+
+            let x = 382 - 6 * (dd.ip_addr.len() as i32);
+            draw6x8(buffer, &dd.ip_addr, x, 631);
         }
+
+        // Push the buffer. Keep in mind that on the actual device, this takes
+        // more than 10 seconds!
 
         backend.show_buffer()?;
     }
 
     Ok(())
 }
-
 
 #[derive(Clone, Debug)]
 struct DisplayData {

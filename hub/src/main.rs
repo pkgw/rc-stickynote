@@ -1,7 +1,7 @@
 //! The hub that brokers events between clients and the displayer panel.
 
 use futures::prelude::*;
-use protocol;
+use rc_stickynote_protocol::{DisplayMessage, HelloMessage};
 use std::io::Error;
 use structopt::StructOpt;
 use tokio::{
@@ -58,7 +58,7 @@ fn handle_new_connection(mut socket: TcpStream) -> Result<(), Error> {
         let mut jsonread = SymmetricallyFramed::new(ldread, SymmetricalJson::default());
         let ldwrite = FramedWrite::new(write, LengthDelimitedCodec::new());
         let mut jsonwrite = SymmetricallyFramed::new(ldwrite, SymmetricalJson::default());
-        let hello: Option<Result<protocol::HelloMessage, Error>> = jsonread.next().await;
+        let hello: Option<Result<HelloMessage, Error>> = jsonread.next().await;
 
         match hello {
             Some(Ok(_)) => {
@@ -72,7 +72,7 @@ fn handle_new_connection(mut socket: TcpStream) -> Result<(), Error> {
         }
 
         jsonwrite
-            .send(protocol::DisplayMessage {
+            .send(DisplayMessage {
                 message: "hello".to_owned(),
             })
             .await?;
@@ -91,7 +91,7 @@ fn handle_new_connection(mut socket: TcpStream) -> Result<(), Error> {
             }
             .to_owned();
 
-            jsonwrite.send(protocol::DisplayMessage { message }).await?;
+            jsonwrite.send(DisplayMessage { message }).await?;
             tick += 1;
         }
     });

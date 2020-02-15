@@ -10,7 +10,7 @@ use embedded_graphics::{
     Drawing,
 };
 use futures::{prelude::*, select};
-use protocol::HelloMessage;
+use rc_stickynote_protocol::{DisplayMessage, HelloMessage};
 use rusttype::FontCollection;
 use serde::Deserialize;
 use std::{
@@ -81,7 +81,7 @@ pub fn cli(opts: super::ClientCommand) -> Result<(), Error> {
             select! {
                 // New message from the hub.
                 msg = jsonread.try_next().fuse() => {
-                    { let _type_inference: &Result<Option<protocol::DisplayMessage>, _> = &msg; }
+                    { let _type_inference: &Result<Option<DisplayMessage>, _> = &msg; }
 
                     match msg {
                         Ok(Some(m)) => {

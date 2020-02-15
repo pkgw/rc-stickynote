@@ -117,7 +117,13 @@ pub fn cli(opts: super::ClientCommand) -> Result<(), Error> {
     })
 }
 
-fn renderer_thread(
+fn renderer_thread(config: ClientConfiguration, receiver: Receiver<DisplayData>) {
+    if let Err(e) = renderer_thread_inner(config, receiver) {
+        eprintln!("ERROR: rendererer thread exited with error: {}", e);
+    }
+}
+
+fn renderer_thread_inner(
     config: ClientConfiguration,
     receiver: Receiver<DisplayData>,
 ) -> Result<(), std::io::Error> {

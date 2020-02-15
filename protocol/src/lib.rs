@@ -37,3 +37,12 @@ pub enum ClientHelloMessage {
     /// This client wants to update the "person is:" message.
     PersonIsUpdate(PersonIsUpdateHelloMessage),
 }
+
+/// Validate a "person_is" message.
+///
+/// We just check length against an empirical limit based on the current
+/// display size and font setup. The font used is variable-width so there's
+/// some slop but we don't need to be exactly perfect.
+pub fn is_person_is_valid(person_is: &str) -> bool {
+    person_is.len() < 23
+}

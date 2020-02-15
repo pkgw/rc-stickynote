@@ -117,6 +117,16 @@ fn handle_new_connection(
 
         match hello {
             ClientHelloMessage::PersonIsUpdate(msg) => {
+                if !is_person_is_valid(&msg.person_is) {
+                    // We could attempt to truncate it or something, but the
+                    // system is tightly-coupled enough that I don't see the
+                    // value in implementing that.
+                    return Err(Error::new(
+                        std::io::ErrorKind::Other,
+                        "PersonIsUpdate message didn't validate; ignoring",
+                    ));
+                }
+
                 // Just accept the update and we're done.
                 return match send_updates.send(DisplayStateMutation::SetPersonIs(msg.person_is)) {
                     Ok(_) => Ok(()),

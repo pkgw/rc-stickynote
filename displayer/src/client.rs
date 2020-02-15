@@ -11,7 +11,8 @@ use embedded_graphics::{
 };
 use futures::{prelude::*, select};
 use rc_stickynote_protocol::{
-    ClientHelloMessage, DisplayHelloMessage, DisplayMessage, PersonIsUpdateHelloMessage,
+    is_person_is_valid, ClientHelloMessage, DisplayHelloMessage, DisplayMessage,
+    PersonIsUpdateHelloMessage,
 };
 use rusttype::FontCollection;
 use serde::Deserialize;
@@ -315,6 +316,13 @@ impl DisplayData {
 /// Send a status update to the hub. This uses the same infrastructure as the
 /// main client but is way simpler.
 pub fn set_status_cli(opts: super::SetStatusCommand) -> Result<(), Error> {
+    if !is_person_is_valid(&opts.status) {
+        return Err(Error::new(
+            std::io::ErrorKind::Other,
+            format!("status \"{}\" invalid -- likely too long", &opts.status),
+        ));
+    }
+
     let config: ClientConfiguration = {
         let mut f = File::open(&opts.config_path)?;
         let mut buf = Vec::new();

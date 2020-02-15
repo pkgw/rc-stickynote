@@ -21,7 +21,7 @@ pub struct ServeCommand {}
 
 #[derive(Clone, Debug)]
 enum DisplayStateMutation {
-    SetPersonIs(String),
+    SetPersonIs(PersonIsUpdateHelloMessage),
 }
 
 impl DisplayStateMutation {
@@ -30,7 +30,8 @@ impl DisplayStateMutation {
     pub fn consume_into(self, state: &mut DisplayMessage) {
         match self {
             DisplayStateMutation::SetPersonIs(msg) => {
-                state.person_is = msg;
+                state.person_is = msg.person_is;
+                state.person_is_timestamp = msg.timestamp;
             }
         }
     }
@@ -128,7 +129,7 @@ fn handle_new_connection(
                 }
 
                 // Just accept the update and we're done.
-                return match send_updates.send(DisplayStateMutation::SetPersonIs(msg.person_is)) {
+                return match send_updates.send(DisplayStateMutation::SetPersonIs(msg)) {
                     Ok(_) => Ok(()),
                     Err(_) => Err(Error::new(
                         std::io::ErrorKind::Other,

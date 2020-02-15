@@ -91,7 +91,7 @@ pub fn main_cli(opts: super::ClientCommand) -> Result<(), Error> {
                     match msg {
                         Ok(Some(m)) => {
                             println!("msg: {:?}", m);
-                            display_data.person_is = m.person_is;
+                            display_data.update_from_message(m);
                         },
 
                         Ok(None) => break,
@@ -103,7 +103,6 @@ pub fn main_cli(opts: super::ClientCommand) -> Result<(), Error> {
                 // Time has passed since the last interval tick.
                 _ = interval.tick().fuse() => {
                     println!("local tick");
-                    display_data.update_local()?;
                 }
             }
 
@@ -149,6 +148,8 @@ fn renderer_thread_inner(
         collection.into_font()?
     };
 
+    let ago_formatter = timeago::Formatter::new();
+
     loop {
         // Zip through the channel until we find the very latest message.
         // We might be able to do this with a mutex on a scalar value, but
@@ -172,9 +173,14 @@ fn renderer_thread_inner(
             };
         }
 
+        // Update the "local" bits.
+
+        dd.update_local()?;
+
         // Render into the buffer.
 
         {
+            backend.clear_buffer(Backend::WHITE)?;
             let buffer = backend.get_buffer_mut();
 
             fn draw6x8(buf: &mut <Backend as DisplayBackend>::Buffer, s: &str, x: i32, y: i32) {
@@ -220,7 +226,7 @@ fn renderer_thread_inner(
                 }),
             );
 
-            // "Scientist is ..."
+            // "The Innovation Scientist is ..." text
 
             let x = 8;
             let y = 54;
@@ -239,6 +245,8 @@ fn renderer_thread_inner(
                 Backend::BLACK,
                 Backend::WHITE,
             ));
+
+            // The actual status message
 
             let y = y + 2 * delta + 12;
             let delta = delta;
@@ -262,6 +270,20 @@ fn renderer_thread_inner(
 
             buffer.draw(layout.draw_at(x, y + yofs, Backend::WHITE, Backend::BLACK));
 
+            // "updated at ..." to go with the status message
+
+            let y = y + delta + 4;
+
+            let msg = format!(
+                "updated at {} (about {})",
+                dd.person_is_timestamp
+                    .with_timezone(&dd.now.timezone())
+                    .format("%I:%M %p"),
+                ago_formatter.convert_chrono(dd.person_is_timestamp, dd.now)
+            );
+            let x = 382 - 6 * (msg.len() as i32);
+            draw6x8(buffer, &msg, x, y);
+
             // IP address
 
             let x = 382 - 6 * (dd.ip_addr.len() as i32);
@@ -279,8 +301,12 @@ fn renderer_thread_inner(
 
 #[derive(Clone, Debug)]
 struct DisplayData {
-    pub now: DateTime<Local>,
+    // Digested from DisplayMessage:
     pub person_is: String,
+    pub person_is_timestamp: DateTime<Utc>,
+
+    // "Local" values determined without the hub:
+    pub now: DateTime<Local>,
     pub ip_addr: String,
 }
 
@@ -288,11 +314,17 @@ impl DisplayData {
     fn new() -> Result<Self, std::io::Error> {
         let mut dd = DisplayData {
             now: Local::now(),
-            person_is: "???".to_owned(),
+            person_is: "whereabouts unknown".to_owned(),
+            person_is_timestamp: Utc::now(),
             ip_addr: "".to_owned(),
         };
         dd.update_local()?;
         Ok(dd)
+    }
+
+    fn update_from_message(&mut self, msg: DisplayMessage) {
+        self.person_is = msg.person_is;
+        self.person_is_timestamp = msg.person_is_timestamp;
     }
 
     fn update_local(&mut self) -> Result<(), std::io::Error> {
@@ -342,6 +374,7 @@ pub fn set_status_cli(opts: super::SetStatusCommand) -> Result<(), Error> {
             .send(ClientHelloMessage::PersonIsUpdate(
                 PersonIsUpdateHelloMessage {
                     person_is: opts.status,
+                    timestamp: Utc::now(),
                 },
             ))
             .await?;

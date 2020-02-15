@@ -1,17 +1,23 @@
 use serde::{Deserialize, Serialize};
 
+pub type Timestamp = chrono::DateTime<chrono::Utc>;
+
 /// A message sent to the panel giving all of the information it needs to
 /// populate the display.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct DisplayMessage {
     /// The "person is:" message.
     pub person_is: String,
+
+    /// When the "person is:" message was last updated.
+    pub person_is_timestamp: Timestamp,
 }
 
 impl Default for DisplayMessage {
     fn default() -> Self {
         DisplayMessage {
             person_is: "whereabouts unknown".to_owned(),
+            person_is_timestamp: chrono::Utc::now(),
         }
     }
 }
@@ -25,6 +31,9 @@ pub struct DisplayHelloMessage {}
 pub struct PersonIsUpdateHelloMessage {
     /// The new "person is:" message.
     pub person_is: String,
+
+    /// The message timestamp.
+    pub timestamp: Timestamp,
 }
 
 /// A message sent to hub from a client introducing itself.

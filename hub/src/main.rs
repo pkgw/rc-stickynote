@@ -24,6 +24,18 @@ enum DisplayStateMutation {
     SetPersonIs(String),
 }
 
+impl DisplayStateMutation {
+    /// Apply the mutation defined by this value to the specified state
+    /// object, consuming this value in the process.
+    pub fn consume_into(self, state: &mut DisplayMessage) {
+        match self {
+            DisplayStateMutation::SetPersonIs(msg) => {
+                state.person_is = msg;
+            }
+        }
+    }
+}
+
 impl ServeCommand {
     async fn cli(self) -> Result<(), Error> {
         let addr = "127.0.0.1:20200";
@@ -39,7 +51,7 @@ impl ServeCommand {
                 maybe_socket = incoming.next().fuse() => {
                     match maybe_socket {
                         Some(Ok(sock)) => {
-                            match handle_new_connection(sock, send_updates.clone()) {
+                            match handle_new_connection(sock, display_state.clone(), send_updates.clone()) {
                                 Ok(_) => {}
                                 Err(e) => {
                                     println!("error while setting up new connection: {:?}", e);
@@ -60,14 +72,14 @@ impl ServeCommand {
 
                 maybe_update = receive_updates.next().fuse() => {
                     match maybe_update {
-                        Some(Ok(DisplayStateMutation::SetPersonIs(msg))) => { display_state.person_is = msg; },
+                        Some(Ok(mutation)) => mutation.consume_into(&mut display_state),
 
                         Some(Err(err)) => {
                             println!("receive_updates error = {}", err);
                         },
 
                         None => {
-                            println!("receive_update ran out??");
+                            println!("receive_updates ran out??");
                         },
                     }
                 },
@@ -78,6 +90,7 @@ impl ServeCommand {
 
 fn handle_new_connection(
     mut socket: TcpStream,
+    mut display_state: DisplayMessage,
     send_updates: Sender<DisplayStateMutation>,
 ) -> Result<(), Error> {
     println!("Accepted connection from {:?}", socket.peer_addr());
@@ -86,11 +99,10 @@ fn handle_new_connection(
         let (read, write) = socket.split();
         let ldread = FramedRead::new(read, LengthDelimitedCodec::new());
         let mut jsonread = SymmetricallyFramed::new(ldread, SymmetricalJson::default());
-        let ldwrite = FramedWrite::new(write, LengthDelimitedCodec::new());
-        let mut jsonwrite = SymmetricallyFramed::new(ldwrite, SymmetricalJson::default());
-        let hello: Option<Result<ClientHelloMessage, Error>> = jsonread.next().await;
 
-        let hello = match hello {
+        // Receive the initial "hello" message from the client.
+
+        let hello = match jsonread.next().await {
             Some(Ok(h)) => h,
             Some(Err(err)) => {
                 return Err(Error::new(std::io::ErrorKind::Other, err.to_string()));
@@ -118,28 +130,38 @@ fn handle_new_connection(
             ClientHelloMessage::Display(_) => {}
         };
 
-        jsonwrite
-            .send(DisplayMessage {
-                person_is: "hello".to_owned(),
-            })
-            .await?;
+        // If we're still here, the client is a displayer and we should keep
+        // it updated.
 
+        let ldwrite = FramedWrite::new(write, LengthDelimitedCodec::new());
+        let mut jsonwrite = SymmetricallyFramed::new(ldwrite, SymmetricalJson::default());
+        let mut receive_updates = send_updates.subscribe();
+
+        // We'll make sure to send the client an update at least this often. The
+        // interval will fire immediately, which means that the client will get an
+        // update right off the bat, as desired.
         let mut interval = time::interval(Duration::from_millis(60_000));
-        let mut tick = 0usize;
 
         loop {
-            interval.tick().await;
+            select! {
+                _ = interval.tick().fuse() => {},
 
-            // temporary demo hack
-            let person_is = if tick % 2 == 0 {
-                "in"
-            } else {
-                "getting coffee"
+                maybe_update = receive_updates.next().fuse() => {
+                    match maybe_update {
+                        Some(Ok(mutation)) => mutation.consume_into(&mut display_state),
+
+                        Some(Err(err)) => {
+                            println!("client receive_updates error = {}", err);
+                        },
+
+                        None => {
+                            println!("client receive_updates ran out??");
+                        },
+                    }
+                },
             }
-            .to_owned();
 
-            jsonwrite.send(DisplayMessage { person_is }).await?;
-            tick += 1;
+            jsonwrite.send(display_state.clone()).await?;
         }
     });
 

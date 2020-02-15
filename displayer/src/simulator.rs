@@ -286,6 +286,7 @@ impl DisplayBackend for SimulatorBackend {
             thread::sleep(Duration::from_millis(200));
         }
 
+        println!("*** unblocking thread ***");
         Ok(())
     }
 

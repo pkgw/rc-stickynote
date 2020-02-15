@@ -64,7 +64,7 @@ pub struct ClientCommand {
 
 impl ClientCommand {
     fn cli(self) -> Result<(), Error> {
-        client::cli(self)
+        client::main_cli(self)
     }
 }
 
@@ -148,6 +148,20 @@ impl DemoFontCommand {
 
         backend.show_buffer()?;
         Ok(())
+    }
+}
+
+// set-status subcommand
+
+#[derive(Debug, StructOpt)]
+pub struct SetStatusCommand {
+    config_path: PathBuf,
+    status: String,
+}
+
+impl SetStatusCommand {
+    fn cli(self) -> Result<(), Error> {
+        client::set_status_cli(self)
     }
 }
 
@@ -246,6 +260,10 @@ enum RootCli {
     /// Render a TrueType font at various sizes.
     DemoFont(DemoFontCommand),
 
+    #[structopt(name = "set-status")]
+    /// Set the "scientist is:" satus on the display
+    SetStatus(SetStatusCommand),
+
     #[structopt(name = "show-ips")]
     /// Show IP addresses on the display
     ShowIps(ShowIpsCommand),
@@ -257,6 +275,7 @@ impl RootCli {
             RootCli::ClearAndSleep(opts) => opts.cli(),
             RootCli::Client(opts) => opts.cli(),
             RootCli::DemoFont(opts) => opts.cli(),
+            RootCli::SetStatus(opts) => opts.cli(),
             RootCli::ShowIps(opts) => opts.cli(),
         }
     }

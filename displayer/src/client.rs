@@ -10,7 +10,9 @@ use embedded_graphics::{
     Drawing,
 };
 use futures::{prelude::*, select};
-use rc_stickynote_protocol::{ClientHelloMessage, DisplayHelloMessage, DisplayMessage};
+use rc_stickynote_protocol::{
+    ClientHelloMessage, DisplayHelloMessage, DisplayMessage, PersonIsUpdateHelloMessage,
+};
 use rusttype::FontCollection;
 use serde::Deserialize;
 use std::{
@@ -39,7 +41,7 @@ struct ClientConfiguration {
     serif_path: String,
 }
 
-pub fn cli(opts: super::ClientCommand) -> Result<(), Error> {
+pub fn main_cli(opts: super::ClientCommand) -> Result<(), Error> {
     // Parse the configuration.
 
     let config: ClientConfiguration = {
@@ -308,4 +310,34 @@ impl DisplayData {
 
         Ok(())
     }
+}
+
+/// Send a status update to the hub. This uses the same infrastructure as the
+/// main client but is way simpler.
+pub fn set_status_cli(opts: super::SetStatusCommand) -> Result<(), Error> {
+    let config: ClientConfiguration = {
+        let mut f = File::open(&opts.config_path)?;
+        let mut buf = Vec::new();
+        f.read_to_end(&mut buf)?;
+        toml::from_slice(&buf[..])?
+    };
+
+    let mut rt = Runtime::new()?;
+
+    rt.block_on(async {
+        let hub_connection =
+            TcpStream::connect((config.hub_host.as_ref(), config.hub_port)).await?;
+        let ldwrite = FramedWrite::new(hub_connection, LengthDelimitedCodec::new());
+        let mut jsonwrite = SymmetricallyFramed::new(ldwrite, SymmetricalJson::default());
+
+        jsonwrite
+            .send(ClientHelloMessage::PersonIsUpdate(
+                PersonIsUpdateHelloMessage {
+                    person_is: opts.status,
+                },
+            ))
+            .await?;
+
+        Ok(())
+    })
 }

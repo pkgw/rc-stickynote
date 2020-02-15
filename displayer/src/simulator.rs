@@ -53,6 +53,8 @@ pub struct Display {
 
 impl Display {
     pub fn run_once(&mut self) -> bool {
+        let mut should_exit = false;
+
         // Handle events
         for event in self.event_pump.poll_iter() {
             match event {
@@ -61,7 +63,7 @@ impl Display {
                     keycode: Some(Keycode::Escape),
                     ..
                 } => {
-                    return true;
+                    should_exit = true;
                 }
                 _ => {}
             }
@@ -82,7 +84,7 @@ impl Display {
         }
 
         self.canvas.present();
-        false
+        should_exit
     }
 
     /// XXX new method for rpi-epd-panel:

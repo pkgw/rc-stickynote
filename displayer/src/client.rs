@@ -10,7 +10,7 @@ use embedded_graphics::{
     Drawing,
 };
 use futures::{prelude::*, select};
-use rc_stickynote_protocol::{DisplayMessage, HelloMessage};
+use rc_stickynote_protocol::{ClientHelloMessage, DisplayHelloMessage, DisplayMessage};
 use rusttype::FontCollection;
 use serde::Deserialize;
 use std::{
@@ -68,7 +68,9 @@ pub fn cli(opts: super::ClientCommand) -> Result<(), Error> {
         let mut jsonwrite = SymmetricallyFramed::new(ldwrite, SymmetricalJson::default());
 
         // Say hello.
-        jsonwrite.send(HelloMessage { a_number: 123 }).await?;
+        jsonwrite
+            .send(ClientHelloMessage::Display(DisplayHelloMessage {}))
+            .await?;
 
         let mut interval = time::interval(Duration::from_millis(600_000));
 
@@ -86,7 +88,7 @@ pub fn cli(opts: super::ClientCommand) -> Result<(), Error> {
                     match msg {
                         Ok(Some(m)) => {
                             println!("msg: {:?}", m);
-                            display_data.scientist_is = m.message;
+                            display_data.person_is = m.person_is;
                         },
 
                         Ok(None) => break,
@@ -237,7 +239,7 @@ fn renderer_thread(
                     .fill(Some(Backend::BLACK)),
             );
 
-            let layout = sans_font.rasterize(&dd.scientist_is, 32.0);
+            let layout = sans_font.rasterize(&dd.person_is, 32.0);
             let x = if layout.width as i32 > 384 {
                 0
             } else {
@@ -269,7 +271,7 @@ fn renderer_thread(
 #[derive(Clone, Debug)]
 struct DisplayData {
     pub now: DateTime<Local>,
-    pub scientist_is: String,
+    pub person_is: String,
     pub ip_addr: String,
 }
 
@@ -277,7 +279,7 @@ impl DisplayData {
     fn new() -> Result<Self, std::io::Error> {
         let mut dd = DisplayData {
             now: Local::now(),
-            scientist_is: "???".to_owned(),
+            person_is: "???".to_owned(),
             ip_addr: "".to_owned(),
         };
         dd.update_local()?;

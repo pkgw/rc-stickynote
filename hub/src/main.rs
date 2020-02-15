@@ -1,7 +1,7 @@
 //! The hub that brokers events between clients and the displayer panel.
 
 use futures::prelude::*;
-use rc_stickynote_protocol::{DisplayMessage, HelloMessage};
+use rc_stickynote_protocol::*;
 use std::io::Error;
 use structopt::StructOpt;
 use tokio::{
@@ -58,7 +58,7 @@ fn handle_new_connection(mut socket: TcpStream) -> Result<(), Error> {
         let mut jsonread = SymmetricallyFramed::new(ldread, SymmetricalJson::default());
         let ldwrite = FramedWrite::new(write, LengthDelimitedCodec::new());
         let mut jsonwrite = SymmetricallyFramed::new(ldwrite, SymmetricalJson::default());
-        let hello: Option<Result<HelloMessage, Error>> = jsonread.next().await;
+        let hello: Option<Result<ClientHelloMessage, Error>> = jsonread.next().await;
 
         match hello {
             Some(Ok(_)) => {
@@ -73,7 +73,7 @@ fn handle_new_connection(mut socket: TcpStream) -> Result<(), Error> {
 
         jsonwrite
             .send(DisplayMessage {
-                message: "hello".to_owned(),
+                person_is: "hello".to_owned(),
             })
             .await?;
 
@@ -84,14 +84,14 @@ fn handle_new_connection(mut socket: TcpStream) -> Result<(), Error> {
             interval.tick().await;
 
             // temporary demo hack
-            let message = if tick % 2 == 0 {
+            let person_is = if tick % 2 == 0 {
                 "in"
             } else {
                 "getting coffee"
             }
             .to_owned();
 
-            jsonwrite.send(DisplayMessage { message }).await?;
+            jsonwrite.send(DisplayMessage { person_is }).await?;
             tick += 1;
         }
     });

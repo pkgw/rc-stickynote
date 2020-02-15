@@ -207,7 +207,7 @@ fn renderer_thread_inner(
             draw6x8(buffer, "May be up to 15 minutes", x, y + 0 * delta);
             draw6x8(buffer, "out of date. If much more", x, y + 1 * delta);
             draw6x8(buffer, "than that, tell Peter his", x, y + 2 * delta);
-            draw6x8(buffer, "sign is broken.", x, y + 3 * delta);
+            draw6x8(buffer, "sticky note is broken.", x, y + 3 * delta);
 
             // hline
 

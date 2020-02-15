@@ -20,31 +20,25 @@ impl ServeCommand {
     async fn cli(self) -> Result<(), Error> {
         let addr = "127.0.0.1:20200";
         let mut listener = TcpListener::bind(addr).await.unwrap();
-
-        let server = async move {
-            let mut incoming = listener.incoming();
-
-            while let Some(socket_res) = incoming.next().await {
-                match socket_res {
-                    Ok(socket) => match handle_new_connection(socket) {
-                        Ok(_) => {}
-                        Err(e) => {
-                            println!("error while setting up new connection: {:?}", e);
-                        }
-                    },
-
-                    Err(err) => {
-                        // Handle error by printing to STDOUT.
-                        println!("accept error = {:?}", err);
-                    }
-                }
-            }
-        };
-
+        let mut incoming = listener.incoming();
         println!("Server running on {}", addr);
 
-        // Start the server and block this async fn until `server` spins down.
-        server.await;
+        while let Some(socket_res) = incoming.next().await {
+            match socket_res {
+                Ok(socket) => match handle_new_connection(socket) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        println!("error while setting up new connection: {:?}", e);
+                    }
+                },
+
+                Err(err) => {
+                    // Handle error by printing to STDOUT.
+                    println!("accept error = {:?}", err);
+                }
+            }
+        }
+
         Ok(())
     }
 }

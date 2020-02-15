@@ -52,6 +52,7 @@ pub struct Display {
 }
 
 impl Display {
+    /// XXX modified for rc-stickynote
     pub fn run_once(&mut self) -> bool {
         let mut should_exit = false;
 
@@ -87,7 +88,7 @@ impl Display {
         should_exit
     }
 
-    /// XXX new method for rpi-epd-panel:
+    /// XXX new method for rc-stickynote:
     pub fn fill(&mut self, color: SimPixelColor) {
         for p in self.pixels.iter_mut() {
             *p = color;

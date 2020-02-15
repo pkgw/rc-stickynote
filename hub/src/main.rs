@@ -1,11 +1,14 @@
 //! The hub that brokers events between clients and the displayer panel.
 
-use futures::prelude::*;
+#![recursion_limit = "256"]
+
+use futures::{prelude::*, select};
 use rc_stickynote_protocol::*;
 use std::io::Error;
 use structopt::StructOpt;
 use tokio::{
     net::{TcpListener, TcpStream},
+    sync::broadcast::{channel, Sender},
     time::{self, Duration},
 };
 use tokio_serde::{formats::SymmetricalJson, SymmetricallyFramed};
@@ -16,6 +19,11 @@ use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 #[derive(Debug, StructOpt)]
 pub struct ServeCommand {}
 
+#[derive(Clone, Debug)]
+enum DisplayStateMutation {
+    SetPersonIs(String),
+}
+
 impl ServeCommand {
     async fn cli(self) -> Result<(), Error> {
         let addr = "127.0.0.1:20200";
@@ -23,27 +31,55 @@ impl ServeCommand {
         let mut incoming = listener.incoming();
         println!("Server running on {}", addr);
 
-        while let Some(socket_res) = incoming.next().await {
-            match socket_res {
-                Ok(socket) => match handle_new_connection(socket) {
-                    Ok(_) => {}
-                    Err(e) => {
-                        println!("error while setting up new connection: {:?}", e);
+        let (send_updates, mut receive_updates) = channel(4);
+        let mut display_state = DisplayMessage::default();
+
+        loop {
+            select! {
+                maybe_socket = incoming.next().fuse() => {
+                    match maybe_socket {
+                        Some(Ok(sock)) => {
+                            match handle_new_connection(sock, send_updates.clone()) {
+                                Ok(_) => {}
+                                Err(e) => {
+                                    println!("error while setting up new connection: {:?}", e);
+                                }
+                            }
+                        },
+
+                        Some(Err(err)) => {
+                            // Handle error by printing to STDOUT.
+                            println!("accept error = {:?}", err);
+                        },
+
+                        None => {
+                            println!("socket ran out??");
+                        },
                     }
                 },
 
-                Err(err) => {
-                    // Handle error by printing to STDOUT.
-                    println!("accept error = {:?}", err);
-                }
+                maybe_update = receive_updates.next().fuse() => {
+                    match maybe_update {
+                        Some(Ok(DisplayStateMutation::SetPersonIs(msg))) => { display_state.person_is = msg; },
+
+                        Some(Err(err)) => {
+                            println!("receive_updates error = {}", err);
+                        },
+
+                        None => {
+                            println!("receive_update ran out??");
+                        },
+                    }
+                },
             }
         }
-
-        Ok(())
     }
 }
 
-fn handle_new_connection(mut socket: TcpStream) -> Result<(), Error> {
+fn handle_new_connection(
+    mut socket: TcpStream,
+    send_updates: Sender<DisplayStateMutation>,
+) -> Result<(), Error> {
     println!("Accepted connection from {:?}", socket.peer_addr());
 
     tokio::spawn(async move {
@@ -56,7 +92,9 @@ fn handle_new_connection(mut socket: TcpStream) -> Result<(), Error> {
 
         let hello = match hello {
             Some(Ok(h)) => h,
-            Some(err) => return err,
+            Some(Err(err)) => {
+                return Err(Error::new(std::io::ErrorKind::Other, err.to_string()));
+            }
             None => {
                 return Err(Error::new(
                     std::io::ErrorKind::Other,
@@ -66,7 +104,16 @@ fn handle_new_connection(mut socket: TcpStream) -> Result<(), Error> {
         };
 
         match hello {
-            ClientHelloMessage::PersonIsUpdate(msg) => {}
+            ClientHelloMessage::PersonIsUpdate(msg) => {
+                // Just accept the update and we're done.
+                return match send_updates.send(DisplayStateMutation::SetPersonIs(msg.person_is)) {
+                    Ok(_) => Ok(()),
+                    Err(_) => Err(Error::new(
+                        std::io::ErrorKind::Other,
+                        "no receivers for thread update?",
+                    )),
+                };
+            }
 
             ClientHelloMessage::Display(_) => {}
         };

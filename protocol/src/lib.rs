@@ -8,6 +8,14 @@ pub struct DisplayMessage {
     pub person_is: String,
 }
 
+impl Default for DisplayMessage {
+    fn default() -> Self {
+        DisplayMessage {
+            person_is: "whereabouts unknown".to_owned(),
+        }
+    }
+}
+
 /// A "hello" from a displayer client.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct DisplayHelloMessage {}

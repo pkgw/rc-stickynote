@@ -60,16 +60,22 @@ fn handle_new_connection(mut socket: TcpStream) -> Result<(), Error> {
         let mut jsonwrite = SymmetricallyFramed::new(ldwrite, SymmetricalJson::default());
         let hello: Option<Result<ClientHelloMessage, Error>> = jsonread.next().await;
 
-        match hello {
-            Some(Ok(_)) => {
-                // don't care about contents right now
-                println!("GOT OK HELLO");
-            }
-
+        let hello = match hello {
+            Some(Ok(h)) => h,
             Some(err) => return err,
+            None => {
+                return Err(Error::new(
+                    std::io::ErrorKind::Other,
+                    "connection dropped before hello?",
+                ));
+            }
+        };
 
-            None => panic!("no hello PANIC BAD"),
-        }
+        match hello {
+            ClientHelloMessage::PersonIsUpdate(msg) => {}
+
+            ClientHelloMessage::Display(_) => {}
+        };
 
         jsonwrite
             .send(DisplayMessage {

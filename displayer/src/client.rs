@@ -196,6 +196,24 @@ fn renderer_thread_inner(
                 );
             }
 
+            fn draw6x8inverted(
+                buf: &mut <Backend as DisplayBackend>::Buffer,
+                s: &str,
+                x: i32,
+                y: i32,
+            ) {
+                buf.draw(
+                    Font6x8::render_str(s)
+                        .style(Style {
+                            fill_color: Some(Backend::BLACK),
+                            stroke_color: Some(Backend::WHITE),
+                            stroke_width: 0u8, // Has no effect on fonts
+                        })
+                        .translate(Coord::new(x, y))
+                        .into_iter(),
+                );
+            }
+
             // The clock
 
             let now = dd.now.format("%I:%M %p").to_string();
@@ -284,10 +302,20 @@ fn renderer_thread_inner(
             let x = 382 - 6 * (msg.len() as i32);
             draw6x8(buffer, &msg, x, y);
 
-            // IP address
+            // Footer and IP address
+
+            let y = 630;
+            let delta = 9;
+
+            buffer.draw(
+                Rectangle::new(Coord::new(0, y), Coord::new(383, y + delta))
+                    .fill(Some(Backend::BLACK)),
+            );
+
+            draw6x8inverted(buffer, "https://github.com/pkgw/rc-stickynote", 2, y + 1);
 
             let x = 382 - 6 * (dd.ip_addr.len() as i32);
-            draw6x8(buffer, &dd.ip_addr, x, 631);
+            draw6x8inverted(buffer, &dd.ip_addr, x, y + 1);
         }
 
         // Push the buffer. Keep in mind that on the actual device, this takes

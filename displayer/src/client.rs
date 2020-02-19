@@ -370,7 +370,7 @@ fn renderer_thread_inner(
             let y = y + delta + 4;
 
             let msg = format!(
-                "updated at {} (about {})",
+                "updated at {} (more than {})",
                 dd.person_is_timestamp
                     .with_timezone(&dd.now.timezone())
                     .format("%I:%M %p"),

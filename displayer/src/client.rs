@@ -30,11 +30,8 @@ use tokio::{
     runtime::Runtime,
     time::{self, Duration},
 };
-use tokio_serde::{
-    formats::{Json, SymmetricalJson},
-    Framed as SerdeFramed, SymmetricallyFramed,
-};
-use tokio_util::codec::{Framed as CodecFramed, FramedRead, FramedWrite, LengthDelimitedCodec};
+use tokio_serde::{formats::Json, Framed as SerdeFramed};
+use tokio_util::codec::{Framed as CodecFramed, LengthDelimitedCodec};
 use toml;
 
 use super::{Backend, DisplayBackend};
@@ -137,13 +134,7 @@ impl ClientConfiguration {
 pub fn main_cli(opts: super::ClientCommand) -> Result<(), Error> {
     // Parse the configuration.
 
-    let config: ClientConfiguration = {
-        let mut f = File::open(&opts.config_path)?;
-        let mut buf = Vec::new();
-        f.read_to_end(&mut buf)?;
-        toml::from_slice(&buf[..])?
-    };
-
+    let config = ClientConfiguration::read_from_file(&opts.config_path)?;
     let (sender, receiver) = channel();
 
     // The actual renderer operates in its own thread since the I/O can be slow
@@ -154,16 +145,10 @@ pub fn main_cli(opts: super::ClientCommand) -> Result<(), Error> {
     let mut rt = Runtime::new()?;
 
     rt.block_on(async {
-        let mut hub_connection =
-            TcpStream::connect((config.hub_host.as_ref(), config.hub_port)).await?;
-        let (hub_read, hub_write) = hub_connection.split();
-        let ldread = FramedRead::new(hub_read, LengthDelimitedCodec::new());
-        let mut jsonread = SymmetricallyFramed::new(ldread, SymmetricalJson::default());
-        let ldwrite = FramedWrite::new(hub_write, LengthDelimitedCodec::new());
-        let mut jsonwrite = SymmetricallyFramed::new(ldwrite, SymmetricalJson::default());
+        let mut hub_comms = config.connect().await?;
 
         // Say hello.
-        jsonwrite
+        hub_comms
             .send(ClientHelloMessage::Display(DisplayHelloMessage {}))
             .await?;
 
@@ -177,7 +162,7 @@ pub fn main_cli(opts: super::ClientCommand) -> Result<(), Error> {
 
             select! {
                 // New message from the hub.
-                msg = jsonread.try_next().fuse() => {
+                msg = hub_comms.try_next().fuse() => {
                     { let _type_inference: &Result<Option<DisplayMessage>, _> = &msg; }
 
                     match msg {

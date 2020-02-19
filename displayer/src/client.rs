@@ -19,27 +19,119 @@ use serde::Deserialize;
 use std::{
     fs::File,
     io::{Error, Read},
+    net::TcpStream as StdTcpStream,
+    path::Path,
     sync::mpsc::{channel, Receiver},
     thread,
 };
 use tokio::{
+    io::{AsyncRead, AsyncWrite},
     net::TcpStream,
     runtime::Runtime,
     time::{self, Duration},
 };
-use tokio_serde::{formats::SymmetricalJson, SymmetricallyFramed};
-use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
+use tokio_serde::{
+    formats::{Json, SymmetricalJson},
+    Framed as SerdeFramed, SymmetricallyFramed,
+};
+use tokio_util::codec::{Framed as CodecFramed, FramedRead, FramedWrite, LengthDelimitedCodec};
 use toml;
 
 use super::{Backend, DisplayBackend};
 use crate::text::DrawFontExt;
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 struct ClientConfiguration {
     hub_host: String,
     hub_port: u16,
+    ssh: Option<ClientSshConfiguration>,
     sans_path: String,
     serif_path: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct ClientSshConfiguration {
+    private_key_path: String,
+    ssh_port: u16,
+    user: String,
+}
+
+/// Lame analogue of `try!` for SSH results, adapting their error type from
+/// async_ssh2's to std::io::Error.
+macro_rules! tryssh {
+    ($e:expr) => {
+        ($e).map_err(|e| match e {
+            async_ssh2::Error::SSH2(e2) => Error::new(std::io::ErrorKind::Other, e2.message()),
+            async_ssh2::Error::Io(e) => e,
+        })?
+    };
+}
+
+/// This is needed to implement our complex JSON/length-delimited codec type
+/// for the transport layer, since due to error E0225 we can't express the
+/// Box<dyn T> trait constraint on more than one trait at a time.
+trait AsyncReadAndWrite: AsyncRead + AsyncWrite + Unpin {}
+
+impl AsyncReadAndWrite for TcpStream {}
+impl AsyncReadAndWrite for async_ssh2::Channel {}
+
+/// The type that defines our client/server communication. We use JSON to
+/// encode our messages via Serde, on top of a length-delimited codec because
+/// Serde needs it, on a transport that is abstracted through a Box so that we
+/// can use either an SSH connection or a raw TCP connection (or other
+/// transports if they're added) as needed.
+type HubTransport = SerdeFramed<
+    CodecFramed<Box<dyn AsyncReadAndWrite>, LengthDelimitedCodec>,
+    DisplayMessage,
+    ClientHelloMessage,
+    Json<DisplayMessage, ClientHelloMessage>,
+>;
+
+impl ClientConfiguration {
+    pub fn read_from_file(path: &Path) -> Result<Self, Error> {
+        let mut f = File::open(&path)?;
+        let mut buf = Vec::new();
+        f.read_to_end(&mut buf)?;
+        Ok(toml::from_slice(&buf[..])?)
+    }
+
+    pub async fn connect(&self) -> Result<HubTransport, Error> {
+        if let Some(sshcfg) = self.ssh.as_ref() {
+            let mut sess = tryssh!(async_ssh2::Session::new());
+
+            // NB this is a non-async TcpStream.connect() so it will block the thread!
+            let transport = StdTcpStream::connect((self.hub_host.as_ref(), sshcfg.ssh_port))?;
+            tryssh!(sess.set_tcp_stream(transport));
+
+            tryssh!(sess.handshake().await);
+            tryssh!(
+                sess.userauth_pubkey_file(
+                    sshcfg.user.as_ref(),
+                    None, // pubkey path; inferred
+                    Path::new(&sshcfg.private_key_path),
+                    None, // passphrase: assume passwordlessness
+                )
+                .await
+            );
+
+            Ok(Self::wrap_transport(tryssh!(
+                sess.channel_direct_tcpip("localhost", self.hub_port, None)
+                    .await
+            )))
+        } else {
+            Ok(Self::wrap_transport(
+                TcpStream::connect((self.hub_host.as_ref(), self.hub_port)).await?,
+            ))
+        }
+    }
+
+    fn wrap_transport<T: AsyncReadAndWrite + 'static>(transport: T) -> HubTransport {
+        let ld = CodecFramed::new(
+            Box::new(transport) as Box<dyn AsyncReadAndWrite>,
+            LengthDelimitedCodec::new(),
+        );
+        SerdeFramed::new(ld, Json::default())
+    }
 }
 
 pub fn main_cli(opts: super::ClientCommand) -> Result<(), Error> {
@@ -383,22 +475,13 @@ pub fn set_status_cli(opts: super::SetStatusCommand) -> Result<(), Error> {
         ));
     }
 
-    let config: ClientConfiguration = {
-        let mut f = File::open(&opts.config_path)?;
-        let mut buf = Vec::new();
-        f.read_to_end(&mut buf)?;
-        toml::from_slice(&buf[..])?
-    };
-
+    let config = ClientConfiguration::read_from_file(&opts.config_path)?;
     let mut rt = Runtime::new()?;
 
     rt.block_on(async {
-        let hub_connection =
-            TcpStream::connect((config.hub_host.as_ref(), config.hub_port)).await?;
-        let ldwrite = FramedWrite::new(hub_connection, LengthDelimitedCodec::new());
-        let mut jsonwrite = SymmetricallyFramed::new(ldwrite, SymmetricalJson::default());
+        let mut hub_comms = config.connect().await?;
 
-        jsonwrite
+        hub_comms
             .send(ClientHelloMessage::PersonIsUpdate(
                 PersonIsUpdateHelloMessage {
                     person_is: opts.status,
@@ -406,7 +489,6 @@ pub fn set_status_cli(opts: super::SetStatusCommand) -> Result<(), Error> {
                 },
             ))
             .await?;
-
         Ok(())
     })
 }

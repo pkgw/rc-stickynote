@@ -10,6 +10,7 @@ simulator = ["sdl2"]
 waveshare = ["epd-waveshare"]
 
 [dependencies]
+async-ssh2 = { git = "https://github.com/spebern/async-ssh2.git", branch = "master" }
 chrono = "^0.4"
 embedded-graphics = "^0.5"
 embedded-hal = { version = "^0.2", features = ["unproven"] }

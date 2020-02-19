@@ -5,7 +5,7 @@ authors = ["Peter Williams <peter@newton.cx>"]
 edition = "2018"
 
 [dependencies]
-egg-mode = { git = "https://github.com/QuietMisdreavus/twitter-rs", branch = "master" }
+# egg-mode = { git = "https://github.com/QuietMisdreavus/twitter-rs", branch = "master" }
 futures = "^0.3"
 rc_stickynote_protocol = { version = "0.1.0", path = "../protocol" }
 serde_json = "^1.0"

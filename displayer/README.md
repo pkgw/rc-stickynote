@@ -20,8 +20,9 @@ etc.
 
 ## Command-Line Interface
 
-This crate compiles to an executable, `displayer`, that has a git-like
-command-line interface with various subcommands. These subcommands are:
+This crate compiles to an executable, `rc_stickynote_displayer`, that has a
+git-like command-line interface with various subcommands. These subcommands
+are:
 
 - `clear-and-sleep` — clear the display and sleep the device
 - `client` — connect to the hub and run the stickynote display

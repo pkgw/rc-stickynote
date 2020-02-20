@@ -1,6 +1,7 @@
 ca-certificates
 console-setup
 curl
+dphys-swapfile
 fake-hwclock
 fbset
 htop

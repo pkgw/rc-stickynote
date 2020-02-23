@@ -167,8 +167,6 @@ pub fn main_cli(_opts: super::ClientCommand) -> Result<(), Error> {
             select! {
                 // New message from the hub.
                 msg = hub_comms.try_next().fuse() => {
-                    { let _type_inference: &Result<Option<DisplayMessage>, _> = &msg; }
-
                     match msg {
                         Ok(Some(m)) => {
                             println!("msg: {:?}", m);

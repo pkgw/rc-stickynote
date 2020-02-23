@@ -12,6 +12,7 @@ waveshare = ["epd-waveshare"]
 [dependencies]
 async-ssh2 = { git = "https://github.com/spebern/async-ssh2.git", branch = "master" }
 chrono = "^0.4"
+confy = "^0.3"
 embedded-graphics = "^0.5"
 embedded-hal = { version = "^0.2", features = ["unproven"] }
 epd-waveshare = { git = "https://github.com/caemor/epd-waveshare", branch = "master", features = ["epd7in5", "graphics"], optional = true }
@@ -28,4 +29,3 @@ timeago = { version = "^0.2", features = ["chrono"] }
 tokio = { version = "0.2", features = ["dns", "rt-threaded", "stream", "tcp", "time"] }
 tokio-serde = { version = "^0.6", features = ["json"] }
 tokio-util = { version = "0.2.0", features = ["codec"] }
-toml = "^0.5"

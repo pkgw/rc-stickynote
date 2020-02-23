@@ -58,9 +58,7 @@ impl ClearAndSleepCommand {
 // client subcommand
 
 #[derive(Debug, StructOpt)]
-pub struct ClientCommand {
-    config_path: PathBuf,
-}
+pub struct ClientCommand {}
 
 impl ClientCommand {
     fn cli(self) -> Result<(), Error> {
@@ -155,7 +153,6 @@ impl DemoFontCommand {
 
 #[derive(Debug, StructOpt)]
 pub struct SetStatusCommand {
-    config_path: PathBuf,
     status: String,
 }
 

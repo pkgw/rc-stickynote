@@ -15,7 +15,7 @@ use rc_stickynote_protocol::{
     PersonIsUpdateHelloMessage,
 };
 use rusttype::FontCollection;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{
     fs::File,
     io::{Error, Read},
@@ -32,12 +32,11 @@ use tokio::{
 };
 use tokio_serde::{formats::Json, Framed as SerdeFramed};
 use tokio_util::codec::{Framed as CodecFramed, LengthDelimitedCodec};
-use toml;
 
 use super::{Backend, DisplayBackend};
 use crate::text::DrawFontExt;
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 struct ClientConfiguration {
     hub_host: String,
     hub_port: u16,
@@ -46,7 +45,19 @@ struct ClientConfiguration {
     serif_path: String,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+impl Default for ClientConfiguration {
+    fn default() -> Self {
+        ClientConfiguration {
+            hub_host: "edit-configuration.example.com".to_owned(),
+            hub_port: 20200,
+            ssh: None,
+            sans_path: "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf".to_owned(),
+            serif_path: "/usr/share/fonts/truetype/freefont/FreeSerif.ttf".to_owned(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 struct ClientSshConfiguration {
     private_key_path: String,
     ssh_port: u16,
@@ -85,13 +96,6 @@ type HubTransport = SerdeFramed<
 >;
 
 impl ClientConfiguration {
-    pub fn read_from_file(path: &Path) -> Result<Self, Error> {
-        let mut f = File::open(&path)?;
-        let mut buf = Vec::new();
-        f.read_to_end(&mut buf)?;
-        Ok(toml::from_slice(&buf[..])?)
-    }
-
     pub async fn connect(&self) -> Result<HubTransport, Error> {
         if let Some(sshcfg) = self.ssh.as_ref() {
             let mut sess = tryssh!(async_ssh2::Session::new());
@@ -131,10 +135,10 @@ impl ClientConfiguration {
     }
 }
 
-pub fn main_cli(opts: super::ClientCommand) -> Result<(), Error> {
+pub fn main_cli(_opts: super::ClientCommand) -> Result<(), Error> {
     // Parse the configuration.
 
-    let config = ClientConfiguration::read_from_file(&opts.config_path)?;
+    let config: ClientConfiguration = confy::load("rc-stickynote-client")?;
     let (sender, receiver) = channel();
 
     // The actual renderer operates in its own thread since the I/O can be slow
@@ -460,7 +464,7 @@ pub fn set_status_cli(opts: super::SetStatusCommand) -> Result<(), Error> {
         ));
     }
 
-    let config = ClientConfiguration::read_from_file(&opts.config_path)?;
+    let config: ClientConfiguration = confy::load("rc-stickynote-client")?;
     let mut rt = Runtime::new()?;
 
     rt.block_on(async {

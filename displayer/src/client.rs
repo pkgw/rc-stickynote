@@ -1,6 +1,7 @@
 //! The long-running panel driving client.
 
 use chrono::prelude::*;
+use daemonize::Daemonize;
 use embedded_graphics::{
     coord::Coord,
     fonts::{Font, Font6x8},
@@ -20,7 +21,7 @@ use std::{
     fs::File,
     io::{Error, Read},
     net::TcpStream as StdTcpStream,
-    path::Path,
+    path::{Path, PathBuf},
     sync::mpsc::{channel, Receiver},
     thread,
 };
@@ -135,7 +136,7 @@ impl ClientConfiguration {
     }
 }
 
-pub fn main_cli(_opts: super::ClientCommand) -> Result<(), Error> {
+pub fn main_cli(opts: super::ClientCommand) -> Result<(), Error> {
     // Parse the configuration.
 
     let config: ClientConfiguration = confy::load("rc-stickynote-client")?;
@@ -147,6 +148,27 @@ pub fn main_cli(_opts: super::ClientCommand) -> Result<(), Error> {
     thread::spawn(move || renderer_thread(cloned_config, receiver));
 
     let mut rt = Runtime::new()?;
+
+    // If requested, let's get into the background
+
+    if opts.daemonize {
+        // TODO: files in /var/run, etc? The idea is to lauch this process as
+        // an unprivleged user.
+        let pid_path: PathBuf = ["rc-stickynote-displayer.pid"].iter().collect();
+        let stdio_path: PathBuf = ["rc-stickynote-displayer.log"].iter().collect();
+        let stdio_handle = File::create(&stdio_path)?;
+
+        let dconfig = Daemonize::new()
+            .pid_file(&pid_path)
+            .stdout(stdio_handle.try_clone()?)
+            .stderr(stdio_handle);
+
+        if let Err(e) = dconfig.start() {
+            return Err(Error::new(std::io::ErrorKind::Other, e.to_string()));
+        }
+    }
+
+    // Ready to start the main event loop
 
     rt.block_on(async {
         let mut hub_comms = config.connect().await?;

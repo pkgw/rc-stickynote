@@ -58,7 +58,14 @@ impl ClearAndSleepCommand {
 // client subcommand
 
 #[derive(Debug, StructOpt)]
-pub struct ClientCommand {}
+pub struct ClientCommand {
+    #[structopt(
+        long = "daemonize",
+        short = "d",
+        help = "If present, detach from the terminal and run as a background daemon"
+    )]
+    daemonize: bool,
+}
 
 impl ClientCommand {
     fn cli(self) -> Result<(), Error> {

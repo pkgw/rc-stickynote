@@ -1,0 +1,19 @@
+# -*- shell-script -*-
+#
+# Example deployment-specific configuration for our customized version of the
+# pi-gen toolchain. Copy this file to the name `pi-gen-config` and customize
+# as appropriate. Hopefully the meanings of the various parameters below are
+# all clear.
+
+export LOCALE_DEFAULT=en_US.UTF-8
+export KEYBOARD_KEYMAP=us
+export KEYBOARD_LAYOUT="English (US)"
+export TIMEZONE_DEFAULT="America/New_York"
+export WPA_ESSID='My WiFi Network Name'
+export WPA_PASSWORD='mywifipassword'  # or leave unset if WiFi has no password
+
+# This sets the password of the built-in user to a random string that changes
+# upon every build! This is a security precaution to avoid creating systems
+# with public, default login information. When customizing this file, you
+# should replace this expression with a fixed password of your choosing.
+export FIRST_USER_PASS="$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)"

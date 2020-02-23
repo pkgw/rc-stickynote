@@ -1,0 +1,29 @@
+# -*- shell-script -*-
+#
+# This file is sourced by `build.sh` to configure various elements of the
+# build. The file `../local/pi-gen-config` should be created from
+# `../local/pi-gen-config.example` and include certain settings that have to
+# be customized to each deployment.
+
+if [ ! -e ../local/pi-gen-config ] ; then
+    echo >&2 "error: you must fill in local/pi-gen-config from local/pi-gen-config.example"
+    exit 1
+fi
+
+export IMG_NAME=rc-stickynote
+export DEPLOY_ZIP=0
+export HOSTNAME=rc-stickynote
+export FIRST_USER_NAME=sticky
+export WORK_DIR=/pigenwork  # can't use default since /vagrant is `nodev`
+export ENABLE_SSH=1
+# export APT_PROXY='http://10.0.2.2:3142'
+
+# The local script should set:
+# - FIRST_USER_PASS
+# - WPA_ESSID
+# - WPA_PASSWORD if appropriate
+# - TIMEZONE_DEFAULT
+#
+# You might also want to set variables like KEYBOARD_KEYMAP, LOCALE_DEFAULT,
+# etc.
+source ../local/pi-gen-config

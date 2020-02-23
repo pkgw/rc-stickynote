@@ -1,0 +1,38 @@
+#! /bin/sh
+
+### BEGIN INIT INFO
+# Provides:		rc-stickynote-display-ip
+# Required-Start:	$remote_fs $syslog
+# Required-Stop:	$remote_fs $syslog
+# Default-Start:	2 3 4 5
+# Default-Stop:	        1 6
+# Short-Description:	Display IP addresses on the Waveshare e-Print Display
+### END INIT INFO
+
+set -e
+
+displayer=/usr/local/bin/rc_stickynote_displayer
+
+case "$1" in
+    start)
+	"$displayer" show-ips
+	;;
+    stop)
+	"$displayer" clear-and-sleep
+	;;
+
+    reload|force-reload|restart|try-restart)
+	"$displayer" clear-and-sleep
+	"$displayer" show-ips
+	;;
+
+    status)
+	echo "nothing to report"
+	;;
+
+    *)
+	echo "usage: $0 {start|stop|reload|force-reload|restart|try-restart|status}" || true
+	exit 1
+esac
+
+exit 0

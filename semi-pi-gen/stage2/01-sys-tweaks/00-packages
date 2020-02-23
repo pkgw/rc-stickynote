@@ -4,6 +4,8 @@ curl
 dphys-swapfile
 fake-hwclock
 fbset
+fonts-dejavu
+fonts-freefont-ttf
 htop
 keyboard-configuration
 less

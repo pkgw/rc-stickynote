@@ -115,7 +115,7 @@ This will output the image file in `semi-pi-gen/deploy/YYYY-MM-DD-rc-stickynote-
 where the `YYYY-MM-DD` corresponds to today’s date.
 
 To rebuild a new image with updated configuration or stickynote executables,
-you can modify the `STAGE_LIST` in the above command to contain just `stage2.
+you can modify the `STAGE_LIST` in the above command to contain just `stage2`.
 
 
 ## Testing: Simulator Client

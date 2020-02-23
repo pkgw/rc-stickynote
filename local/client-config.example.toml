@@ -1,0 +1,14 @@
+# Example deployment-specific configuration for the "displayer" program
+# running on the Raspberry Pi. Copy this file to the name `client-config.toml`
+# and customize as appropriate. See `../displayer/README.md` for explanation
+# of the possible settings.
+
+hub_host = "myhubhost.example.org"
+hub_port = 20200
+sans_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+serif_path = "/usr/share/fonts/truetype/freefont/FreeSerif.ttf"
+
+[ssh]
+private_key_path = "/home/sticky/.ssh/stickynote_ed25519_key"
+user = "hub-ssh-user"
+ssh_port = 22

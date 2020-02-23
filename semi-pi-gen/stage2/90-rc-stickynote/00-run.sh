@@ -32,12 +32,14 @@ on_chroot <<EOF
 chown -R $FIRST_USER_NAME:$FIRST_USER_NAME /home/$FIRST_USER_NAME/.config
 EOF
 
-# init script to display IP addresses upon bootup and clear the display upon
-# poweroff, should all else fail:
+# init scripts. The `display-ip` one displays IP addresses upon bootup and
+# clears the display upon poweroff, should all else fail:
 
 mkdir -p "$ROOTFS_DIR/etc/init.d"
 cp assets/rc-stickynote-display-ip "$ROOTFS_DIR/etc/init.d"
+cp assets/rc-stickynote-displayer "$ROOTFS_DIR/etc/init.d"
 
 on_chroot <<EOF
 update-rc.d rc-stickynote-display-ip defaults
+update-rc.d rc-stickynote-displayer defaults
 EOF

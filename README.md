@@ -100,8 +100,8 @@ cross build --target armv7-unknown-linux-gnueabihf --release
 ## Step 4: Build the RPi OS image
 
 We build the Raspberry Pi OS image using scripts derived from the
-[pi-gen][pi-gen] tool used for the official RPi images. The forked scrips live
-in the `semi-pi-gen/` directory.
+[pi-gen][pi-gen] tool used for the official RPi images. The forked scripts
+live in the `semi-pi-gen/` directory.
 
 [pi-gen]: https://github.com/RPi-Distro/pi-gen
 
@@ -111,8 +111,10 @@ To build the image, run:
 vagrant ssh -c "cd /vagrant/semi-pi-gen && sudo STAGE_LIST='stage0 stage1 stage2' ./build.sh"
 ```
 
-This will output the image file in `semi-pi-gen/deploy/YYYY-MM-DD-rc-stickynote-lite.img`,
-where the `YYYY-MM-DD` corresponds to today’s date.
+This will output the image file in
+`semi-pi-gen/deploy/YYYY-MM-DD-rc-stickynote.img`, where the `YYYY-MM-DD`
+corresponds to today’s date. This command does not automatically rebuild the
+custom software, so make sure to rebuild beforehand if needed.
 
 To rebuild a new image with updated configuration or stickynote executables,
 you can modify the `STAGE_LIST` in the above command to contain just `stage2`.

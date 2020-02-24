@@ -20,6 +20,7 @@ epd-waveshare = { git = "https://github.com/caemor/epd-waveshare", branch = "mas
 futures = "^0.3"
 get_if_addrs = "^0.5"
 linux-embedded-hal = "0.2"
+openssl-probe = "^0.1"
 rc_stickynote_protocol = { version = "0.1.0", path = "../protocol" }
 rusttype = "^0.8"
 sdl2 = { version = "0.31", optional = true }

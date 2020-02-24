@@ -137,6 +137,8 @@ impl ClientConfiguration {
 }
 
 pub fn main_cli(opts: super::ClientCommand) -> Result<(), Error> {
+    openssl_probe::init_ssl_cert_env_vars();
+
     // Parse the configuration.
 
     let config: ClientConfiguration = confy::load("rc-stickynote-client")?;
@@ -602,6 +604,8 @@ pub fn set_status_cli(opts: super::SetStatusCommand) -> Result<(), Error> {
             format!("status \"{}\" invalid -- likely too long", &opts.status),
         ));
     }
+
+    openssl_probe::init_ssl_cert_env_vars();
 
     let config: ClientConfiguration = confy::load("rc-stickynote-client")?;
     let mut rt = Runtime::new()?;

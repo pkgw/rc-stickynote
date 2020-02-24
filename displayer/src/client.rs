@@ -142,16 +142,9 @@ pub fn main_cli(opts: super::ClientCommand) -> Result<(), Error> {
     // Parse the configuration.
 
     let config: ClientConfiguration = confy::load("rc-stickynote-client")?;
-    let (sender, receiver) = channel();
 
-    // The actual renderer operates in its own thread since the I/O can be slow
-    // and we don't want to block the async runtime.
-    let cloned_config = config.clone();
-    thread::spawn(move || renderer_thread(cloned_config, receiver));
-
-    let mut rt = Runtime::new()?;
-
-    // If requested, let's get into the background
+    // If requested, let's get into the background. Do this before any
+    // other thread-y operations.
 
     if opts.daemonize {
         // TODO: files in /var/run, etc? The idea is to lauch this process as
@@ -169,6 +162,14 @@ pub fn main_cli(opts: super::ClientCommand) -> Result<(), Error> {
             return Err(Error::new(std::io::ErrorKind::Other, e.to_string()));
         }
     }
+
+    // The actual renderer operates in its own thread since the I/O can be slow
+    // and we don't want to block the async runtime.
+    let cloned_config = config.clone();
+    let (sender, receiver) = channel();
+    thread::spawn(move || renderer_thread(cloned_config, receiver));
+
+    let mut rt = Runtime::new()?;
 
     // Ready to start the main event loop
 

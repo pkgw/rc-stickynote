@@ -114,10 +114,16 @@ vagrant ssh -c "cd /vagrant/semi-pi-gen && sudo STAGE_LIST='stage0 stage1 stage2
 This will output the image file in
 `semi-pi-gen/deploy/YYYY-MM-DD-rc-stickynote.img`, where the `YYYY-MM-DD`
 corresponds to today’s date. This command does not automatically rebuild the
-custom software, so make sure to rebuild beforehand if needed.
+custom software, so make sure to recompile beforehand if needed. The
+from-scratch build process takes about 20 minutes on my machine.
 
-To rebuild a new image with updated configuration or stickynote executables,
-you can modify the `STAGE_LIST` in the above command to contain just `stage2`.
+To rebuild a new image with updated configuration or stickynote executables, you
+can modify the `STAGE_LIST` in the above command to contain just `stage2`. Note,
+however, that this will reuse the existing filesystem tree, so operations should
+be idempotent. To avoid this, add `CLEAN=1
+PREV_ROOTFS_DIR=/pigenwork/stage1/rootfs` to the `build.sh` environment, where
+`PREV_ROOTFS_DIR` specifies the `rootfs` directory of the previous stage (e.g.,
+`stage1` if you're just rerunning `stage2`).
 
 To write the image to an SD card, first insert the card into your machine. If it
 already contained an OS image, your computer might mount the partitions, which

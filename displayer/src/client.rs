@@ -171,16 +171,29 @@ pub fn main_cli(opts: super::ClientCommand) -> Result<(), Error> {
     // Ready to start the main event loop
 
     rt.block_on(async {
-        let mut hub_comms = config.connect().await?;
+        // How often to wake up this thread if no other events are going
+        // on.
+        let mut wakeup_interval = time::interval(Duration::from_millis(60_000));
 
-        // Say hello.
-        hub_comms
-            .send(ClientHelloMessage::Display(DisplayHelloMessage {}))
-            .await?;
+        // the last time something happened with the hub connection.
+        let mut last_hub_update = time::Instant::now();
 
-        let mut interval = time::interval(Duration::from_millis(600_000));
+        // if there's a hub problem, wait this long to retry connecting.
+        let hub_retry_duration = Duration::from_millis(180_000);
+
+        // How often to redraw the display even if nothing seems to be going on.
+        // This will update the clock, etc.
+        let redraw_duration = Duration::from_millis(600_000);
+
+        // the last time we redrew the display (approximately, since that's
+        // done in another thread and takes nontrivial time).
+        let mut last_redraw = time::Instant::now();
+
+        // do we need to redraw even if redraw_duration hasn't elapsed?
+        let mut need_redraw = true;
 
         let mut display_data = DisplayData::new()?;
+        let mut connection = ServerConnection::default();
 
         loop {
             // `select` on various things that might motivate us to update the
@@ -188,36 +201,136 @@ pub fn main_cli(opts: super::ClientCommand) -> Result<(), Error> {
 
             select! {
                 // New message from the hub.
-                msg = hub_comms.try_next().fuse() => {
+                msg = connection.get_next_message(&config).fuse() => {
+                    last_hub_update = time::Instant::now();
+                    need_redraw = true;
+
                     match msg {
-                        Ok(Some(m)) => {
-                            println!("msg: {:?}", m);
+                        Ok(m) => {
                             display_data.update_from_message(m);
                         },
 
-                        Ok(None) => break,
-
-                        Err(err) => return Err(err),
+                        Err(err) => {
+                            // Note that we do *not* instantly reset `connection`,
+                            // because otherwise we just keep on trying to connect
+                            // over and over again. If the hub is just totally
+                            // down, insistently trying isn't going to help.
+                            println!("hub connection failed: {}", err);
+                            display_data.update_for_no_connection();
+                        }
                     }
                 }
 
-                // Time has passed since the last interval tick.
-                _ = interval.tick().fuse() => {
-                    println!("local tick");
-                }
+                // Time has passed since the last wakeup interval tick.
+                _ = wakeup_interval.tick().fuse() => {}
             }
 
-            // Send the current state over to the display thread!
-            if sender.send(display_data.clone()).is_err() {
-                return Err(Error::new(
-                    std::io::ErrorKind::Other,
-                    "display thread died?!",
-                ));
+            let now = time::Instant::now();
+
+            // Housekeeping: how's the hub connection looking? If the connection is
+            // happy, we're content to just sit and wait -- update messages might
+            // not arrive for *days*. But if the connection has problems, retry if
+            // the time is right.
+
+            if connection.is_failed() && now.duration_since(last_hub_update) > hub_retry_duration {
+                display_data.update_for_no_connection();
+                println!("hub error and delay elapsed; attempting to reconnect ...");
+                connection = ServerConnection::default();
+            }
+
+            // Trigger a draw?
+
+            if need_redraw || now.duration_since(last_redraw) > redraw_duration {
+                if let Err(e) = sender.send(display_data.clone()) {
+                    // Yikes, this is bad. We don't want to exit the program so ...
+                    // just print the error and ignore it. Not much else we can do.
+                    // (We could try sending a message to the hub?)
+                    println!("display thread died?! {}", e);
+                }
+
+                need_redraw = false;
+                last_redraw = now;
             }
         }
-
-        Ok(())
     })
+}
+
+enum ServerConnection {
+    Initializing,
+    Open(HubTransport),
+    Failed,
+}
+
+impl Default for ServerConnection {
+    fn default() -> Self {
+        ServerConnection::Initializing
+    }
+}
+
+impl ServerConnection {
+    fn is_failed(&self) -> bool {
+        match self {
+            ServerConnection::Failed => true,
+            _ => false,
+        }
+    }
+
+    async fn get_next_message(&mut self, config: &ClientConfiguration) -> Result<DisplayMessage, Error> {
+        loop {
+            match self {
+                ServerConnection::Initializing => {
+                    // Note: cannot use ?-syntax here since we need to ensure that we set
+                    // self to the Failed state is anything goes wrong.
+
+                    let mut hub_comms = match config.connect().await {
+                        Ok(c) => c,
+
+                        Err(e) => {
+                            *self = ServerConnection::Failed;
+                            return Err(e)
+                        }
+                    };
+
+                    if let Err(e) = hub_comms
+                        .send(ClientHelloMessage::Display(DisplayHelloMessage {}))
+                        .await {
+                        *self = ServerConnection::Failed;
+                        return Err(e);
+                    }
+
+                    *self = ServerConnection::Open(hub_comms);
+                },
+
+                ServerConnection::Open(ref mut hub_comms) => {
+                    return match hub_comms.try_next().await {
+                        Ok(Some(m)) => {
+                            println!("msg: {:?}", m);
+                            Ok(m)
+                        },
+
+                        Ok(None) => {
+                            *self = ServerConnection::Failed;
+
+                            Err(Error::new(
+                                std::io::ErrorKind::Other,
+                                "hub connection died",
+                            ))
+                        },
+
+                        Err(err) => {
+                            *self = ServerConnection::Failed;
+
+                            Err(err)
+                        },
+                    };
+                }
+
+               ServerConnection::Failed => {
+                    return futures::future::pending().await;
+                }
+            }
+        }
+    }
 }
 
 fn renderer_thread(config: ClientConfiguration, receiver: Receiver<DisplayData>) {
@@ -443,7 +556,7 @@ impl DisplayData {
     fn new() -> Result<Self, std::io::Error> {
         let mut dd = DisplayData {
             now: Local::now(),
-            person_is: "whereabouts unknown".to_owned(),
+            person_is: "[connecting to hub...]".to_owned(),
             person_is_timestamp: Utc::now(),
             ip_addr: "".to_owned(),
         };
@@ -471,6 +584,12 @@ impl DisplayData {
         }
 
         Ok(())
+    }
+
+    fn update_for_no_connection(&mut self) {
+        // TODO: should preserve the person_is message since it may
+        // have contained useful information.
+        self.person_is = "[cannot connect to hub!]".to_owned();
     }
 }
 

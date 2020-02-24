@@ -1,12 +1,12 @@
 #! /bin/sh
 
 ### BEGIN INIT INFO
-# Provides:		rc-stickynote-display-ip
+# Provides:		rc-stickynote-housekeeping
 # Required-Start:	$remote_fs $syslog
 # Required-Stop:	$remote_fs $syslog
 # Default-Start:	2 3 4 5
 # Default-Stop:	        1 6
-# Short-Description:	Display IP addresses on the Waveshare e-Print Display
+# Short-Description:	Waveshare e-Print Display housekeeping
 ### END INIT INFO
 
 set -e
@@ -15,19 +15,20 @@ displayer=/usr/local/bin/rc_stickynote_displayer
 
 case "$1" in
     start)
-	"$displayer" show-ips
+    # This used to do show-ips, but I don't want to worry about boot-time
+    # races between this and the main displayer.
 	;;
+
     stop)
 	"$displayer" clear-and-sleep
 	;;
 
     reload|force-reload|restart|try-restart)
 	"$displayer" clear-and-sleep
-	"$displayer" show-ips
 	;;
 
     status)
-	echo "nothing to report"
+	"$displayer" show-ips
 	;;
 
     *)

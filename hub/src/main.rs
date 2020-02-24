@@ -151,7 +151,7 @@ fn handle_new_connection(
         // We'll make sure to send the client an update at least this often. The
         // interval will fire immediately, which means that the client will get an
         // update right off the bat, as desired.
-        let mut interval = time::interval(Duration::from_millis(60_000));
+        let mut interval = time::interval(Duration::from_millis(1200_000));
 
         loop {
             select! {

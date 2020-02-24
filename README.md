@@ -119,6 +119,25 @@ custom software, so make sure to rebuild beforehand if needed.
 To rebuild a new image with updated configuration or stickynote executables,
 you can modify the `STAGE_LIST` in the above command to contain just `stage2`.
 
+To write the image to an SD card, first insert the card into your machine. If it
+already contained an OS image, your computer might mount the partitions, which
+we definitely don't want! Ummount anything like `/run/$USER/media/boot` or
+`/run/$USER/media/rootfs` that appears.
+
+Once that's done, the obvious GUI method didn't work for me and I don't feel
+like futzing around with this too much, so here's the command-line method to
+flash the disk. **Make sure you specify the right device otherwise you might
+make your machine unbootable**, etc., because we're writing data straight to a
+block device node!
+
+```
+sudo dd bs=4M if=semi-pi-gen/deploy/*-rc-stickynote.img of=/dev/mmcblk0 conv=fsync
+```
+
+If the `dd` seems to exit instantly in a suspicious fashion, you may have a
+stale `/dev/mmcblk0` device. Try removing the SD card, deleting that device
+node, and re-inserting.
+
 
 ## Testing: Simulator Client
 

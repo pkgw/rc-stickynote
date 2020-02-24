@@ -17,7 +17,7 @@ NAME=rc-stickynote-displayer
 PNAME=rc-stickynote-displayer
 DAEMON=/usr/local/bin/rc_stickynote_displayer
 PIDFILE=/home/sticky/$NAME.pid
-DAEMON_ARGS="--daemonize"
+DAEMON_ARGS="client --daemonize"
 SCRIPTNAME=/etc/init.d/$PNAME
 SSD_ARGS="--pidfile $PIDFILE --exec $DAEMON --chuid sticky --chdir /home/sticky"
 

@@ -18,10 +18,10 @@ This project is currently executed on a
 which turns out to be way overpowered for this application.
 
 The EPD is a 680×374 pixel, 7.5", black-and-white display from
-[Waveshare](https://www.waveshare.com/product/displays/e-paper.htm). This
-particular model seems not to be available anymore — instead there are options
-with the same resolution but three colors, or still monochrome but at higher
-resolution.
+[Waveshare](https://www.waveshare.com/product/displays/e-paper.htm) (SKU
+13187). This particular model, the "V1" seems not to be available anymore —
+instead there are options with the same resolution but three colors, or still
+monochrome but at higher resolution (the "V2").
 
 
 ## Software

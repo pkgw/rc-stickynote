@@ -24,6 +24,7 @@ This crate compiles to an executable, `rc_stickynote_displayer`, that has a
 git-like command-line interface with various subcommands. These subcommands
 are:
 
+- `black-screen` — fill the screen will all black
 - `clear-and-sleep` — clear the display and sleep the device
 - `client` — connect to the hub and run the stickynote display
 - `demo-font` — render a TTF or OTF font at various sizes. Some fonts work better
@@ -33,4 +34,4 @@ are:
   interfaces on the display. If no network interfaces have IPv4 addresses, the
   program will sleep and retry for 100 seconds. This makes it suitable to be
   run at bootup so that if your RPi automatically establishes some kind of
-  network connection, you can see its addres and know where to SSH to.
+  network connection, you can see its address and know where to SSH to.

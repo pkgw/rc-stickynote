@@ -41,6 +41,20 @@ trait DisplayBackend: Sized {
     fn sleep_device(&mut self) -> Result<(), Error>;
 }
 
+// black-screen subcommand
+
+#[derive(Debug, StructOpt)]
+pub struct BlackScreenCommand {}
+
+impl BlackScreenCommand {
+    fn cli(self) -> Result<(), Error> {
+        let mut backend = Backend::open()?;
+        backend.clear_buffer(Backend::BLACK)?;
+        backend.show_buffer()?;
+        Ok(())
+    }
+}
+
 // clear-and-sleep subcommand
 
 #[derive(Debug, StructOpt)]
@@ -252,6 +266,10 @@ impl ShowIpsCommand {
 #[derive(Debug, StructOpt)]
 #[structopt(name = "displayer", about = "e-Ink Displayer tools")]
 enum RootCli {
+    #[structopt(name = "black-screen")]
+    /// Set the display to all black
+    BlackScreen(BlackScreenCommand),
+
     #[structopt(name = "clear-and-sleep")]
     /// Clear the display and sleep the device
     ClearAndSleep(ClearAndSleepCommand),
@@ -276,6 +294,7 @@ enum RootCli {
 impl RootCli {
     fn cli(self) -> Result<(), Error> {
         match self {
+            RootCli::BlackScreen(opts) => opts.cli(),
             RootCli::ClearAndSleep(opts) => opts.cli(),
             RootCli::Client(opts) => opts.cli(),
             RootCli::DemoFont(opts) => opts.cli(),

@@ -39,6 +39,7 @@ trait DisplayBackend: Sized {
     fn show_buffer(&mut self) -> Result<(), Error>;
     fn clear_display(&mut self) -> Result<(), Error>;
     fn sleep_device(&mut self) -> Result<(), Error>;
+    fn wake_up_device(&mut self) -> Result<(), Error>;
 }
 
 // black-screen subcommand

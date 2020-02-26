@@ -111,4 +111,9 @@ impl DisplayBackend for EPD7in5Backend {
     fn sleep_device(&mut self) -> Result<(), Error> {
         Ok(self.epd7in5.sleep(&mut self.spi)?)
     }
+
+    fn wake_up_device(&mut self) -> Result<(), Error> {
+        let mut delay = Delay {};
+        Ok(self.epd7in5.wake_up(&mut self.spi, &mut delay)?)
+    }
 }

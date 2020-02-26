@@ -536,11 +536,6 @@ fn renderer_thread_inner(
             draw6x8inverted(buffer, &dd.ip_addr, x, y + 1);
         }
 
-        // Push the buffer. Keep in mind that on the actual device, this takes
-        // more than 10 seconds!
-
-        backend.show_buffer()?;
-
         // https://www.waveshare.com/wiki/E-Paper_Driver_HAT:
         //
         // "Question: Why my e-paper has ghosting problem after working for
@@ -548,7 +543,18 @@ fn renderer_thread_inner(
         // disconnect it if you needn't refresh the e-paper but need to power
         // on your development board or Raspberry Pi for long time. Otherwise,
         // the voltage of panel keeps high and it will damage the panel."
+        //
+        // The above is why we wake up and sleep the device.
+        //
+        // Further, keep in mind that on the actual device, showing the buffer
+        // takes more than 10 seconds!
+        //
+        // In principle we could try to be smart and have a timer for sleeping
+        // the device to avoid multiple cycles during rapid-fire updates, but
+        // that seems like overkill.
 
+        backend.wake_up_device()?;
+        backend.show_buffer()?;
         backend.sleep_device()?;
     }
 

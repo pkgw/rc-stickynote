@@ -302,4 +302,9 @@ impl DisplayBackend for SimulatorBackend {
         println!("*** simulator no-op: sleep_device() ***");
         Ok(())
     }
+
+    fn wake_up_device(&mut self) -> Result<(), Error> {
+        println!("*** simulator no-op: wake_up_device() ***");
+        Ok(())
+    }
 }

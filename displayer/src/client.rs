@@ -278,7 +278,10 @@ impl ServerConnection {
         }
     }
 
-    async fn get_next_message(&mut self, config: &ClientConfiguration) -> Result<DisplayMessage, Error> {
+    async fn get_next_message(
+        &mut self,
+        config: &ClientConfiguration,
+    ) -> Result<DisplayMessage, Error> {
         loop {
             match self {
                 ServerConnection::Initializing => {
@@ -290,45 +293,43 @@ impl ServerConnection {
 
                         Err(e) => {
                             *self = ServerConnection::Failed;
-                            return Err(e)
+                            return Err(e);
                         }
                     };
 
                     if let Err(e) = hub_comms
                         .send(ClientHelloMessage::Display(DisplayHelloMessage {}))
-                        .await {
+                        .await
+                    {
                         *self = ServerConnection::Failed;
                         return Err(e);
                     }
 
                     *self = ServerConnection::Open(hub_comms);
-                },
+                }
 
                 ServerConnection::Open(ref mut hub_comms) => {
                     return match hub_comms.try_next().await {
                         Ok(Some(m)) => {
                             println!("msg: {:?}", m);
                             Ok(m)
-                        },
+                        }
 
                         Ok(None) => {
                             *self = ServerConnection::Failed;
 
-                            Err(Error::new(
-                                std::io::ErrorKind::Other,
-                                "hub connection died",
-                            ))
-                        },
+                            Err(Error::new(std::io::ErrorKind::Other, "hub connection died"))
+                        }
 
                         Err(err) => {
                             *self = ServerConnection::Failed;
 
                             Err(err)
-                        },
+                        }
                     };
                 }
 
-               ServerConnection::Failed => {
+                ServerConnection::Failed => {
                     return futures::future::pending().await;
                 }
             }
@@ -539,6 +540,16 @@ fn renderer_thread_inner(
         // more than 10 seconds!
 
         backend.show_buffer()?;
+
+        // https://www.waveshare.com/wiki/E-Paper_Driver_HAT:
+        //
+        // "Question: Why my e-paper has ghosting problem after working for
+        // some days? Answer: Please set the e-paper to sleep mode or
+        // disconnect it if you needn't refresh the e-paper but need to power
+        // on your development board or Raspberry Pi for long time. Otherwise,
+        // the voltage of panel keeps high and it will damage the panel."
+
+        backend.sleep_device()?;
     }
 
     Ok(())

@@ -51,6 +51,7 @@ impl BlackScreenCommand {
         let mut backend = Backend::open()?;
         backend.clear_buffer(Backend::BLACK)?;
         backend.show_buffer()?;
+        backend.sleep_device()?;
         Ok(())
     }
 }
@@ -166,6 +167,7 @@ impl DemoFontCommand {
         }
 
         backend.show_buffer()?;
+        backend.sleep_device()?;
         Ok(())
     }
 }
@@ -257,6 +259,7 @@ impl ShowIpsCommand {
         }
 
         backend.show_buffer()?;
+        backend.sleep_device()?;
         Ok(())
     }
 }

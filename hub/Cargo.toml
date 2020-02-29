@@ -10,6 +10,6 @@ futures = "^0.3"
 rc_stickynote_protocol = { version = "0.1.0", path = "../protocol" }
 serde_json = "^1.0"
 structopt = "^0.3"
-tokio = { version = "0.2", features = ["dns", "macros", "rt-threaded", "sync", "tcp", "time"] }
+tokio = { version = "0.2", features = ["dns", "macros", "rt-threaded", "stream", "sync", "tcp", "time"] }
 tokio-serde = { version = "^0.6", features = ["json"] }
 tokio-util = { version = "0.2.0", features = ["codec"] }

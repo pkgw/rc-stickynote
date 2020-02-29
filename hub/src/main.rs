@@ -3,6 +3,7 @@
 #![recursion_limit = "256"]
 
 use futures::{prelude::*, select};
+use hmac::{Hmac, Mac};
 use hyper::{
     header,
     service::{make_service_fn, service_fn},
@@ -10,6 +11,8 @@ use hyper::{
 };
 use rc_stickynote_protocol::*;
 use serde::Deserialize;
+use serde_json::json;
+use sha2::Sha256;
 use std::{
     fs::File,
     io::{Error, Read},
@@ -99,8 +102,15 @@ impl ServeCommand {
         // Set up the HTTP server
 
         let http_host = sp_host;
-        let http_service = make_service_fn(move |_| async {
-            Ok::<_, GenericError>(service_fn(move |req| handle_http_request(req)))
+        let http_config = config.clone();
+        let http_service = make_service_fn(move |_| {
+            let http_config = http_config.clone();
+
+            async {
+                Ok::<_, GenericError>(service_fn(move |req| {
+                    handle_http_request(req, http_config.clone())
+                }))
+            }
         });
         let http_server =
             Server::bind(&SocketAddr::from((http_host, config.http_port))).serve(http_service);
@@ -245,9 +255,12 @@ fn handle_new_stickyproto_connection(
     Ok(())
 }
 
-async fn handle_http_request(req: Request<Body>) -> Result<Response<Body>, GenericError> {
+async fn handle_http_request(
+    req: Request<Body>,
+    config: ServerConfiguration,
+) -> Result<Response<Body>, GenericError> {
     match (req.method(), req.uri().path()) {
-        (&Method::GET, "/webhooks/twitter") => handle_twitter_webhook_get(req).await,
+        (&Method::GET, "/webhooks/twitter") => handle_twitter_webhook_get(req, &config).await,
 
         _ => Ok(Response::builder()
             .status(hyper::StatusCode::NOT_FOUND)
@@ -258,7 +271,10 @@ async fn handle_http_request(req: Request<Body>) -> Result<Response<Body>, Gener
 
 /// This function must perform Twitter's "challenge-response check" (CRC, but
 /// not the one you're used to.
-async fn handle_twitter_webhook_get(req: Request<Body>) -> Result<Response<Body>, GenericError> {
+async fn handle_twitter_webhook_get(
+    req: Request<Body>,
+    config: &ServerConfiguration,
+) -> Result<Response<Body>, GenericError> {
     // Get the crc_token argument.
 
     let mut crc_token = None;
@@ -282,26 +298,22 @@ async fn handle_twitter_webhook_get(req: Request<Body>) -> Result<Response<Body>
         }
     };
 
-    // Temporary: demo code that hopefully does the Twitter challenge-response
-    // check correctly.
+    // Do the computation.
 
-    use hmac::{Hmac, Mac};
-    use sha2::Sha256;
-    const CONSUMER_SECRET: &[u8] = b"SECRET";
-
-    let mut mac = Hmac::<Sha256>::new_varkey(CONSUMER_SECRET).expect("uhoh");
+    let key = config.twitter.consumer_api_secret_key.as_bytes();
+    let mut mac = Hmac::<Sha256>::new_varkey(key).expect("uhoh");
     mac.input(crc_token.as_bytes());
     let result = mac.result();
     let enc = base64::encode(&result.code());
 
-    println!("B64: {}", enc);
+    // Respond.
 
-    // end temp
-
+    let resp_val = json!({ "response_token": format!("sha256={}", enc) });
+    let resp_json = serde_json::to_string(&resp_val)?;
     let response = Response::builder()
         .status(hyper::StatusCode::OK)
         .header(header::CONTENT_TYPE, "application/json")
-        .body(Body::from(r#"{"ok": true}"#))?;
+        .body(Body::from(resp_json))?;
     Ok(response)
 }
 

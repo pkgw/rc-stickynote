@@ -73,25 +73,25 @@ impl ServeCommand {
     async fn cli(self) -> Result<(), Error> {
         let config = ServerConfiguration::load(&self.config_path)?;
 
-        let host = "127.0.0.1";
-        let mut listener = TcpListener::bind((host, config.stickyproto_port))
-            .await
-            .unwrap();
-        let mut incoming = listener.incoming();
-        println!(
-            "Stickynote protocol server running on {}:{}",
-            host, config.stickyproto_port
-        );
-
         let (send_updates, mut receive_updates) = channel(4);
         let mut display_state = DisplayMessage::default();
 
+        let sp_host = "127.0.0.1";
+        let mut sp_listener = TcpListener::bind((sp_host, config.stickyproto_port))
+            .await
+            .unwrap();
+        let mut sp_incoming = sp_listener.incoming();
+        println!(
+            "Stickynote protocol server running on {}:{}",
+            sp_host, config.stickyproto_port
+        );
+
         loop {
             select! {
-                maybe_socket = incoming.next().fuse() => {
+                maybe_socket = sp_incoming.next().fuse() => {
                     match maybe_socket {
                         Some(Ok(sock)) => {
-                            match handle_new_connection(sock, display_state.clone(), send_updates.clone()) {
+                            match handle_new_stickyproto_connection(sock, display_state.clone(), send_updates.clone()) {
                                 Ok(_) => {}
                                 Err(e) => {
                                     println!("error while setting up new connection: {:?}", e);
@@ -128,12 +128,15 @@ impl ServeCommand {
     }
 }
 
-fn handle_new_connection(
+fn handle_new_stickyproto_connection(
     mut socket: TcpStream,
     mut display_state: DisplayMessage,
     send_updates: Sender<DisplayStateMutation>,
 ) -> Result<(), Error> {
-    println!("Accepted connection from {:?}", socket.peer_addr());
+    println!(
+        "Accepted stickyproto connection from {:?}",
+        socket.peer_addr()
+    );
 
     tokio::spawn(async move {
         let (read, write) = socket.split();

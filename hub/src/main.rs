@@ -4,7 +4,12 @@
 
 use futures::{prelude::*, select};
 use rc_stickynote_protocol::*;
-use std::io::Error;
+use serde::Deserialize;
+use std::{
+    fs::File,
+    io::{Error, Read},
+    path::{Path, PathBuf},
+};
 use structopt::StructOpt;
 use tokio::{
     net::{TcpListener, TcpStream},
@@ -16,8 +21,35 @@ use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
 // "serve" subcommand
 
+#[derive(Clone, Debug, Deserialize)]
+struct ServerConfiguration {
+    stickyproto_port: u16,
+    http_port: u16,
+    twitter: ServerTwitterConfiguration,
+}
+
+impl ServerConfiguration {
+    fn load<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
+        let mut f = File::open(path)?;
+        let mut buf = Vec::new();
+        f.read_to_end(&mut buf)?;
+        Ok(toml::from_slice(&buf[..])?)
+    }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct ServerTwitterConfiguration {
+    consumer_api_key: String,
+    consumer_api_secret_key: String,
+    access_token: String,
+    access_token_secret: String,
+}
+
 #[derive(Debug, StructOpt)]
-pub struct ServeCommand {}
+pub struct ServeCommand {
+    #[structopt(help = "The path to the server configuration file")]
+    config_path: PathBuf,
+}
 
 #[derive(Clone, Debug)]
 enum DisplayStateMutation {
@@ -39,10 +71,17 @@ impl DisplayStateMutation {
 
 impl ServeCommand {
     async fn cli(self) -> Result<(), Error> {
-        let addr = "127.0.0.1:20200";
-        let mut listener = TcpListener::bind(addr).await.unwrap();
+        let config = ServerConfiguration::load(&self.config_path)?;
+
+        let host = "127.0.0.1";
+        let mut listener = TcpListener::bind((host, config.stickyproto_port))
+            .await
+            .unwrap();
         let mut incoming = listener.incoming();
-        println!("Server running on {}", addr);
+        println!(
+            "Stickynote protocol server running on {}:{}",
+            host, config.stickyproto_port
+        );
 
         let (send_updates, mut receive_updates) = channel(4);
         let mut display_state = DisplayMessage::default();

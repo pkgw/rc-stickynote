@@ -3,11 +3,17 @@
 #![recursion_limit = "256"]
 
 use futures::{prelude::*, select};
+use hyper::{
+    header,
+    service::{make_service_fn, service_fn},
+    Body, Method, Request, Response, Server,
+};
 use rc_stickynote_protocol::*;
 use serde::Deserialize;
 use std::{
     fs::File,
     io::{Error, Read},
+    net::{Ipv4Addr, SocketAddr},
     path::{Path, PathBuf},
 };
 use structopt::StructOpt;
@@ -20,6 +26,8 @@ use tokio_serde::{formats::SymmetricalJson, SymmetricallyFramed};
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
 // "serve" subcommand
+
+type GenericError = Box<dyn std::error::Error + Send + Sync>;
 
 #[derive(Clone, Debug, Deserialize)]
 struct ServerConfiguration {
@@ -70,13 +78,15 @@ impl DisplayStateMutation {
 }
 
 impl ServeCommand {
-    async fn cli(self) -> Result<(), Error> {
+    async fn cli(self) -> Result<(), GenericError> {
         let config = ServerConfiguration::load(&self.config_path)?;
 
         let (send_updates, mut receive_updates) = channel(4);
         let mut display_state = DisplayMessage::default();
 
-        let sp_host = "127.0.0.1";
+        // Set up the stickynote protocol server
+
+        let sp_host = Ipv4Addr::new(127, 0, 0, 1);
         let mut sp_listener = TcpListener::bind((sp_host, config.stickyproto_port))
             .await
             .unwrap();
@@ -85,6 +95,20 @@ impl ServeCommand {
             "Stickynote protocol server running on {}:{}",
             sp_host, config.stickyproto_port
         );
+
+        // Set up the HTTP server
+
+        let http_host = sp_host;
+        let http_service = make_service_fn(move |_| async {
+            Ok::<_, GenericError>(service_fn(move |req| handle_http_request(req)))
+        });
+        let http_server =
+            Server::bind(&SocketAddr::from((http_host, config.http_port))).serve(http_service);
+        println!("HTTP server running on {}:{}", http_host, config.http_port);
+
+        tokio::spawn(async move { http_server.await });
+
+        // Stickynote event loop
 
         loop {
             select! {
@@ -221,13 +245,49 @@ fn handle_new_stickyproto_connection(
     Ok(())
 }
 
+async fn handle_http_request(req: Request<Body>) -> Result<Response<Body>, GenericError> {
+    match (req.method(), req.uri().path()) {
+        (&Method::GET, "/webhooks/twitter") => handle_twitter_webhook_get(req).await,
+
+        _ => Ok(Response::builder()
+            .status(hyper::StatusCode::NOT_FOUND)
+            .body((&b"not found"[..]).into())
+            .unwrap()),
+    }
+}
+
+async fn handle_twitter_webhook_get(req: Request<Body>) -> Result<Response<Body>, GenericError> {
+    // Temporary: demo code that hopefully does the Twitter challenge-response
+    // check correctly.
+
+    use hmac::{Hmac, Mac};
+    use sha2::Sha256;
+    const CONSUMER_SECRET: &[u8] = b"SECRET";
+    const CRC_TOKEN: &[u8] = b"crctoken";
+
+    let mut mac = Hmac::<Sha256>::new_varkey(CONSUMER_SECRET).expect("uhoh");
+    mac.input(CRC_TOKEN);
+    let result = mac.result();
+    let enc = base64::encode(&result.code());
+
+    println!("B64: {}", enc);
+
+    // end temp
+
+    let response = Response::builder()
+        .status(hyper::StatusCode::OK)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(r#"{"ok": true}"#))?;
+    Ok(response)
+}
+
 // "twitter-login" subcommand
 
 #[derive(Debug, StructOpt)]
 pub struct TwitterLoginCommand {}
 
 impl TwitterLoginCommand {
-    async fn cli(self) -> Result<(), Error> {
+    async fn cli(self) -> Result<(), GenericError> {
         Ok(())
     }
 }
@@ -247,7 +307,7 @@ enum RootCli {
 }
 
 impl RootCli {
-    async fn cli(self) -> Result<(), Error> {
+    async fn cli(self) -> Result<(), GenericError> {
         match self {
             RootCli::Serve(opts) => opts.cli().await,
             RootCli::TwitterLogin(opts) => opts.cli().await,
@@ -256,6 +316,6 @@ impl RootCli {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Error> {
+async fn main() -> Result<(), GenericError> {
     RootCli::from_args().cli().await
 }

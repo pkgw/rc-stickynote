@@ -5,11 +5,15 @@ authors = ["Peter Williams <peter@newton.cx>"]
 edition = "2018"
 
 [dependencies]
+base64 = "^0.11"
 # egg-mode = { git = "https://github.com/QuietMisdreavus/twitter-rs", branch = "master" }
 futures = "^0.3"
+hyper = "^0.13"
+hmac = "^0.7"
 rc_stickynote_protocol = { version = "0.1.0", path = "../protocol" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "^1.0"
+sha2 = "^0.8"
 structopt = "^0.3"
 tokio = { version = "0.2", features = ["dns", "macros", "rt-threaded", "stream", "sync", "tcp", "time"] }
 tokio-serde = { version = "^0.6", features = ["json"] }

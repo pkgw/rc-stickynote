@@ -256,17 +256,41 @@ async fn handle_http_request(req: Request<Body>) -> Result<Response<Body>, Gener
     }
 }
 
+/// This function must perform Twitter's "challenge-response check" (CRC, but
+/// not the one you're used to.
 async fn handle_twitter_webhook_get(req: Request<Body>) -> Result<Response<Body>, GenericError> {
+    // Get the crc_token argument.
+
+    let mut crc_token = None;
+
+    if let Some(qstring) = req.uri().query() {
+        for (name, value) in url::form_urlencoded::parse(qstring.as_bytes()) {
+            if name == "crc_token" {
+                crc_token = Some(value);
+            }
+        }
+    }
+
+    let crc_token = match crc_token {
+        Some(t) => t,
+
+        None => {
+            return Ok(Response::builder()
+                .status(hyper::StatusCode::BAD_REQUEST)
+                .body((&b"expected crc_token"[..]).into())
+                .unwrap());
+        }
+    };
+
     // Temporary: demo code that hopefully does the Twitter challenge-response
     // check correctly.
 
     use hmac::{Hmac, Mac};
     use sha2::Sha256;
     const CONSUMER_SECRET: &[u8] = b"SECRET";
-    const CRC_TOKEN: &[u8] = b"crctoken";
 
     let mut mac = Hmac::<Sha256>::new_varkey(CONSUMER_SECRET).expect("uhoh");
-    mac.input(CRC_TOKEN);
+    mac.input(crc_token.as_bytes());
     let result = mac.result();
     let enc = base64::encode(&result.code());
 

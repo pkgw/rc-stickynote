@@ -19,3 +19,4 @@ tokio = { version = "0.2", features = ["dns", "macros", "rt-threaded", "stream",
 tokio-serde = { version = "^0.6", features = ["json"] }
 tokio-util = { version = "0.2.0", features = ["codec"] }
 toml = "^0.5"
+url = "^2.1"

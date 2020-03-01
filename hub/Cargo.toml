@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 base64 = "^0.11"
-# egg-mode = { git = "https://github.com/QuietMisdreavus/twitter-rs", branch = "master" }
+egg-mode = { git = "https://github.com/QuietMisdreavus/twitter-rs", branch = "master" }
 futures = "^0.3"
 hyper = "^0.13"
 hmac = "^0.7"

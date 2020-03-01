@@ -1,5 +1,6 @@
 /client-config.toml
 /hub-config.toml
+/hub-state.toml
 /pi-gen-config
 /stickynote_*_key
 /stickynote_*_key.pub

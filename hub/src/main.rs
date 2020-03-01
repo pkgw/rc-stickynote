@@ -10,12 +10,12 @@ use hyper::{
     Body, Method, Request, Response, Server,
 };
 use rc_stickynote_protocol::*;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sha2::Sha256;
 use std::{
     fs::File,
-    io::{Error, Read},
+    io::{stdin, stdout, Error, Read, Write},
     net::{Ipv4Addr, SocketAddr},
     path::{Path, PathBuf},
 };
@@ -28,7 +28,7 @@ use tokio::{
 use tokio_serde::{formats::SymmetricalJson, SymmetricallyFramed};
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
 
-// "serve" subcommand
+// Configuration and state for the hub program
 
 type GenericError = Box<dyn std::error::Error + Send + Sync>;
 
@@ -55,6 +55,82 @@ struct ServerTwitterConfiguration {
     access_token: String,
     access_token_secret: String,
 }
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct ServerState {
+    twitter: ServerTwitterState,
+}
+
+impl Default for ServerState {
+    fn default() -> Self {
+        ServerState {
+            twitter: ServerTwitterState::default(),
+        }
+    }
+}
+
+impl ServerState {
+    fn try_load<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
+        use std::io::ErrorKind::NotFound;
+
+        match File::open(path) {
+            Ok(mut f) => {
+                let mut buf = Vec::new();
+                f.read_to_end(&mut buf)?;
+                Ok(toml::from_slice(&buf[..])?)
+            }
+
+            Err(e) => {
+                if e.kind() == NotFound {
+                    Ok(ServerState::default())
+                } else {
+                    Err(e.into())
+                }
+            }
+        }
+    }
+
+    fn save<P: AsRef<Path>>(&self, path: P) -> Result<(), GenericError> {
+        let mut f = File::create(path)?;
+        let data = toml::to_string(self)?;
+        f.write_all(data.as_bytes())?;
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct ServerTwitterState {
+    access_token: String,
+    access_token_secret: String,
+}
+
+impl Default for ServerTwitterState {
+    fn default() -> Self {
+        ServerTwitterState {
+            access_token: "invalid".to_owned(),
+            access_token_secret: "invalid".to_owned(),
+        }
+    }
+}
+
+impl ServerTwitterState {
+    fn get_token(&self, config: &ServerConfiguration) -> egg_mode::Token {
+        let con_token = egg_mode::KeyPair::new(
+            config.twitter.consumer_api_key.clone(),
+            config.twitter.consumer_api_secret_key.clone(),
+        );
+
+        let access_token =
+            egg_mode::KeyPair::new(self.access_token.clone(), self.access_token_secret.clone());
+
+        egg_mode::Token::Access {
+            consumer: con_token,
+            access: access_token,
+        }
+    }
+}
+
+// "serve" subcommand
 
 #[derive(Debug, StructOpt)]
 pub struct ServeCommand {
@@ -320,10 +396,55 @@ async fn handle_twitter_webhook_get(
 // "twitter-login" subcommand
 
 #[derive(Debug, StructOpt)]
-pub struct TwitterLoginCommand {}
+pub struct TwitterLoginCommand {
+    #[structopt(help = "The path to the server configuration file")]
+    config_path: PathBuf,
+
+    #[structopt(help = "The path to the server state file (need not exist)")]
+    state_path: PathBuf,
+}
 
 impl TwitterLoginCommand {
     async fn cli(self) -> Result<(), GenericError> {
+        let config = ServerConfiguration::load(&self.config_path)?;
+        let mut state = ServerState::try_load(&self.state_path)?;
+
+        println!("Beginning authentication flow ...");
+        let con_token = egg_mode::KeyPair::new(
+            config.twitter.consumer_api_key,
+            config.twitter.consumer_api_secret_key,
+        );
+        let req_token = egg_mode::request_token(&con_token, "oob").await?;
+        let auth_url = egg_mode::authorize_url(&req_token);
+        print!(
+            "Visit the following URL and obtain a verification PIN:\n\n\
+             {}\n\n\
+             Then enter the PIN here: ",
+            auth_url
+        );
+        stdout().flush()?;
+
+        let mut pin: String = String::new();
+        stdin().read_line(&mut pin)?;
+
+        let (token, user_id, screen_name) =
+            egg_mode::access_token(con_token, &req_token, pin).await?;
+        println!("Authenticated as @{} (user ID {})", screen_name, user_id);
+
+        match token {
+            egg_mode::Token::Access {
+                access: ref access_token,
+                ..
+            } => {
+                state.twitter.access_token = access_token.key.to_string();
+                state.twitter.access_token_secret = access_token.secret.to_string();
+            }
+
+            _ => panic!("expected Access-type token"),
+        }
+
+        state.save(&self.state_path)?;
+
         Ok(())
     }
 }

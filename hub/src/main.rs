@@ -70,6 +70,13 @@ impl Default for ServerState {
 }
 
 impl ServerState {
+    fn load<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
+        let mut f = File::open(path)?;
+        let mut buf = Vec::new();
+        f.read_to_end(&mut buf)?;
+        Ok(toml::from_slice(&buf[..])?)
+    }
+
     fn try_load<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
         use std::io::ErrorKind::NotFound;
 
@@ -351,6 +358,8 @@ async fn handle_twitter_webhook_get(
     req: Request<Body>,
     config: &ServerConfiguration,
 ) -> Result<Response<Body>, GenericError> {
+    println!("handling Twitter challenge-response check");
+
     // Get the crc_token argument.
 
     let mut crc_token = None;
@@ -449,6 +458,38 @@ impl TwitterLoginCommand {
     }
 }
 
+// "twitter-register-webhook" subcommand
+
+#[derive(Debug, StructOpt)]
+pub struct TwitterRegisterWebhookCommand {
+    #[structopt(help = "The path to the server configuration file")]
+    config_path: PathBuf,
+
+    #[structopt(help = "The path to the server state file")]
+    state_path: PathBuf,
+
+    #[structopt(
+        long = "env",
+        help = "The name of the app API \"environment\" on Twitter"
+    )]
+    env_name: String,
+
+    #[structopt(long = "url", help = "The URL to register as the webhook")]
+    url: String,
+}
+
+impl TwitterRegisterWebhookCommand {
+    async fn cli(self) -> Result<(), GenericError> {
+        let config = ServerConfiguration::load(&self.config_path)?;
+        let state = ServerState::load(&self.state_path)?;
+        let token = state.twitter.get_token(&config);
+        let hookspec = egg_mode::activity::WebhookSpec::new(&self.url);
+        let result = hookspec.register(&self.env_name, &token).await?;
+        println!("registered webhook: {:?}", result);
+        Ok(())
+    }
+}
+
 // CLI root interface
 
 #[derive(Debug, StructOpt)]
@@ -461,6 +502,10 @@ enum RootCli {
     #[structopt(name = "twitter-login")]
     /// Login to the connected Twitter account
     TwitterLogin(TwitterLoginCommand),
+
+    #[structopt(name = "twitter-register-webhook")]
+    /// Register the activity webhook with Twitter
+    TwitterRegisterWebhook(TwitterRegisterWebhookCommand),
 }
 
 impl RootCli {
@@ -468,6 +513,7 @@ impl RootCli {
         match self {
             RootCli::Serve(opts) => opts.cli().await,
             RootCli::TwitterLogin(opts) => opts.cli().await,
+            RootCli::TwitterRegisterWebhook(opts) => opts.cli().await,
         }
     }
 }

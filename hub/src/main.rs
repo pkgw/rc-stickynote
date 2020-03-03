@@ -483,6 +483,33 @@ impl TwitterRegisterWebhookCommand {
     }
 }
 
+// "twitter-unregister-webhook" subcommand
+
+#[derive(Debug, StructOpt)]
+pub struct TwitterUnregisterWebhookCommand {
+    #[structopt(help = "The path to the server configuration file")]
+    config_path: PathBuf,
+
+    #[structopt(help = "The path to the server state file")]
+    state_path: PathBuf,
+
+    /// TODO: if we really want this workflow to be reliable, we should save
+    /// this ID in the state file.
+    #[structopt(long = "id", help = "The ID of the webhook")]
+    hook_id: String,
+}
+
+impl TwitterUnregisterWebhookCommand {
+    async fn cli(self) -> Result<(), GenericError> {
+        let config = ServerConfiguration::load(&self.config_path)?;
+        let state = ServerState::load(&self.state_path)?;
+        let token = state.twitter.get_token(&config);
+        egg_mode::activity::delete_webhook(&config.twitter.env_name, &self.hook_id, &token).await?;
+        println!("deregistered webhook");
+        Ok(())
+    }
+}
+
 // CLI root interface
 
 #[derive(Debug, StructOpt)]
@@ -499,6 +526,10 @@ enum RootCli {
     #[structopt(name = "twitter-register-webhook")]
     /// Register the activity webhook with Twitter
     TwitterRegisterWebhook(TwitterRegisterWebhookCommand),
+
+    #[structopt(name = "twitter-unregister-webhook")]
+    /// Un-register the activity webhook with Twitter
+    TwitterUnregisterWebhook(TwitterUnregisterWebhookCommand),
 }
 
 impl RootCli {
@@ -507,6 +538,7 @@ impl RootCli {
             RootCli::Serve(opts) => opts.cli().await,
             RootCli::TwitterLogin(opts) => opts.cli().await,
             RootCli::TwitterRegisterWebhook(opts) => opts.cli().await,
+            RootCli::TwitterUnregisterWebhook(opts) => opts.cli().await,
         }
     }
 }

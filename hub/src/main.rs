@@ -52,6 +52,7 @@ impl ServerConfiguration {
 struct ServerTwitterConfiguration {
     env_name: String,
     webhook_url: String,
+    allowed_sender_id: String,
     consumer_api_key: String,
     consumer_api_secret_key: String,
     access_token: String,
@@ -413,21 +414,117 @@ async fn handle_twitter_webhook_post(
 ) -> Result<Response<Body>, GenericError> {
     println!("handling Twitter webhook event");
 
-    // DEBUG
-
-    for (name, value) in req.headers() {
-        println!("header: {} = {:?}", name, value);
+    enum EarlyExit {
+        Irrelevant(&'static str),
+        Error(GenericError),
     }
 
-    let bytes = hyper::body::to_bytes(req.into_body()).await?;
-    let body_text = String::from_utf8(bytes.to_vec())?;
-    println!("BODY: {}", body_text);
+    impl<T: 'static + std::error::Error + Send + Sync> From<T> for EarlyExit {
+        fn from(e: T) -> Self {
+            EarlyExit::Error(Box::new(e))
+        }
+    }
 
-    // Respond.
+    async fn inner(req: Request<Body>, config: &ServerConfiguration) -> Result<(), EarlyExit> {
+        // Validate the request.
 
-    let response = Response::builder()
-        .status(hyper::StatusCode::NO_CONTENT)
-        .body(Body::from(""))?;
+        let signature = req
+            .headers()
+            .get("x-twitter-webhooks-signature")
+            .ok_or(EarlyExit::Error(
+                "no x-twitter-webhooks-signature header".into(),
+            ))?
+            .to_str()?
+            .to_owned();
+
+        let body = hyper::body::to_bytes(req.into_body()).await?;
+        let key = config.twitter.consumer_api_secret_key.as_bytes();
+        let mut mac = Hmac::<Sha256>::new_varkey(key).expect("uhoh");
+        mac.input(&body);
+        let result = mac.result();
+        let enc = format!("sha256={}", base64::encode(&result.code()));
+
+        // I believe that in principle, we ought to use a constant-time comparison
+        // function to avoid timing attacks (see `mac.result()` docs).
+
+        if enc != signature {
+            return Err(EarlyExit::Error("signature mismatch".into()));
+        }
+
+        // Now we can start parsing the event.
+
+        let body = String::from_utf8(body.to_vec())?;
+        let body: serde_json::Value = serde_json::from_str(&body)?;
+
+        let item = body
+            .get("direct_message_events")
+            .ok_or(EarlyExit::Irrelevant("not DM event"))?;
+
+        // The value can be a list, presumably to allow batching, but
+        // we're going to go ahead and assume that's not going to happen
+        // for us.
+        let item = item
+            .get(0)
+            .ok_or(EarlyExit::Irrelevant("empty DM Event list?"))?;
+
+        let item = item
+            .get("message_create")
+            .ok_or(EarlyExit::Irrelevant("not creation"))?;
+
+        let sender_id = item
+            .get("sender_id")
+            .ok_or(EarlyExit::Error("no sender_id".into()))?;
+
+        if sender_id != &json!(&config.twitter.allowed_sender_id) {
+            return Err(EarlyExit::Irrelevant("wrong sender"));
+        }
+
+        let item = item
+            .get("message_data")
+            .ok_or(EarlyExit::Error("no message_data".into()))?;
+
+        let item = item
+            .get("text")
+            .ok_or(EarlyExit::Error("no message_data.text".into()))?;
+
+        let text = item
+            .as_str()
+            .ok_or(EarlyExit::Error("message text is not a string".into()))?;
+
+        // We finally have the text!
+        println!("GOT TEXT: {}", text);
+
+        Ok(())
+    }
+
+    let rv = inner(req, config).await;
+
+    let response = if let Err(ref e) = rv {
+        match e {
+            EarlyExit::Irrelevant(s) => {
+                println!("  => not relevant: {}", s);
+
+                Response::builder()
+                    .status(hyper::StatusCode::NO_CONTENT)
+                    .body(Body::from(""))?
+            }
+
+            EarlyExit::Error(e) => {
+                println!("  => ERROR: {}", e);
+
+                Response::builder()
+                    .status(hyper::StatusCode::BAD_REQUEST)
+                    .body(Body::from(e.to_string()))?
+            }
+        }
+    } else {
+        println!("  => success!");
+
+        Response::builder()
+            .status(hyper::StatusCode::NO_CONTENT)
+            .body(Body::from(""))?
+    };
+
     Ok(response)
 }
 

@@ -50,6 +50,8 @@ impl ServerConfiguration {
 
 #[derive(Clone, Debug, Deserialize)]
 struct ServerTwitterConfiguration {
+    env_name: String,
+    webhook_url: String,
     consumer_api_key: String,
     consumer_api_secret_key: String,
     access_token: String,
@@ -467,15 +469,6 @@ pub struct TwitterRegisterWebhookCommand {
 
     #[structopt(help = "The path to the server state file")]
     state_path: PathBuf,
-
-    #[structopt(
-        long = "env",
-        help = "The name of the app API \"environment\" on Twitter"
-    )]
-    env_name: String,
-
-    #[structopt(long = "url", help = "The URL to register as the webhook")]
-    url: String,
 }
 
 impl TwitterRegisterWebhookCommand {
@@ -483,8 +476,8 @@ impl TwitterRegisterWebhookCommand {
         let config = ServerConfiguration::load(&self.config_path)?;
         let state = ServerState::load(&self.state_path)?;
         let token = state.twitter.get_token(&config);
-        let hookspec = egg_mode::activity::WebhookSpec::new(&self.url);
-        let result = hookspec.register(&self.env_name, &token).await?;
+        let hookspec = egg_mode::activity::WebhookSpec::new(&config.twitter.webhook_url);
+        let result = hookspec.register(&config.twitter.env_name, &token).await?;
         println!("registered webhook: {:?}", result);
         Ok(())
     }

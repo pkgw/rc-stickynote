@@ -347,6 +347,8 @@ async fn handle_http_request(
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/webhooks/twitter") => handle_twitter_webhook_get(req, &config).await,
 
+        (&Method::POST, "/webhooks/twitter") => handle_twitter_webhook_post(req, &config).await,
+
         _ => Ok(Response::builder()
             .status(hyper::StatusCode::NOT_FOUND)
             .body((&b"not found"[..]).into())
@@ -401,6 +403,31 @@ async fn handle_twitter_webhook_get(
         .status(hyper::StatusCode::OK)
         .header(header::CONTENT_TYPE, "application/json")
         .body(Body::from(resp_json))?;
+    Ok(response)
+}
+
+/// This function is called when something happens to the subscribed account.
+async fn handle_twitter_webhook_post(
+    req: Request<Body>,
+    config: &ServerConfiguration,
+) -> Result<Response<Body>, GenericError> {
+    println!("handling Twitter webhook event");
+
+    // DEBUG
+
+    for (name, value) in req.headers() {
+        println!("header: {} = {:?}", name, value);
+    }
+
+    let bytes = hyper::body::to_bytes(req.into_body()).await?;
+    let body_text = String::from_utf8(bytes.to_vec())?;
+    println!("BODY: {}", body_text);
+
+    // Respond.
+
+    let response = Response::builder()
+        .status(hyper::StatusCode::NO_CONTENT)
+        .body(Body::from(""))?;
     Ok(response)
 }
 
@@ -483,6 +510,28 @@ impl TwitterRegisterWebhookCommand {
     }
 }
 
+// "twitter-subscribe" subcommand
+
+#[derive(Debug, StructOpt)]
+pub struct TwitterSubscribeCommand {
+    #[structopt(help = "The path to the server configuration file")]
+    config_path: PathBuf,
+
+    #[structopt(help = "The path to the server state file")]
+    state_path: PathBuf,
+}
+
+impl TwitterSubscribeCommand {
+    async fn cli(self) -> Result<(), GenericError> {
+        let config = ServerConfiguration::load(&self.config_path)?;
+        let state = ServerState::load(&self.state_path)?;
+        let token = state.twitter.get_token(&config);
+        egg_mode::activity::subscribe_current_user(&config.twitter.env_name, &token).await?;
+        println!("subscribed to activity from logged-in user");
+        Ok(())
+    }
+}
+
 // "twitter-unregister-webhook" subcommand
 
 #[derive(Debug, StructOpt)]
@@ -527,6 +576,10 @@ enum RootCli {
     /// Register the activity webhook with Twitter
     TwitterRegisterWebhook(TwitterRegisterWebhookCommand),
 
+    #[structopt(name = "twitter-subscribe")]
+    /// Subscribe to Twitter events from the logged-in user
+    TwitterSubscribe(TwitterSubscribeCommand),
+
     #[structopt(name = "twitter-unregister-webhook")]
     /// Un-register the activity webhook with Twitter
     TwitterUnregisterWebhook(TwitterUnregisterWebhookCommand),
@@ -538,6 +591,7 @@ impl RootCli {
             RootCli::Serve(opts) => opts.cli().await,
             RootCli::TwitterLogin(opts) => opts.cli().await,
             RootCli::TwitterRegisterWebhook(opts) => opts.cli().await,
+            RootCli::TwitterSubscribe(opts) => opts.cli().await,
             RootCli::TwitterUnregisterWebhook(opts) => opts.cli().await,
         }
     }

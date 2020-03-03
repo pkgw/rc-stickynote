@@ -2,6 +2,7 @@
 
 #![recursion_limit = "256"]
 
+use chrono::offset::TimeZone;
 use futures::{prelude::*, select};
 use hmac::{Hmac, Mac};
 use hyper::{
@@ -189,12 +190,15 @@ impl ServeCommand {
 
         let http_host = sp_host;
         let http_config = config.clone();
+        let http_send_updates = send_updates.clone();
+
         let http_service = make_service_fn(move |_| {
             let http_config = http_config.clone();
+            let send_updates = http_send_updates.clone();
 
             async {
                 Ok::<_, GenericError>(service_fn(move |req| {
-                    handle_http_request(req, http_config.clone())
+                    handle_http_request(req, http_config.clone(), send_updates.clone())
                 }))
             }
         });
@@ -344,11 +348,14 @@ fn handle_new_stickyproto_connection(
 async fn handle_http_request(
     req: Request<Body>,
     config: ServerConfiguration,
+    send_updates: Sender<DisplayStateMutation>,
 ) -> Result<Response<Body>, GenericError> {
     match (req.method(), req.uri().path()) {
         (&Method::GET, "/webhooks/twitter") => handle_twitter_webhook_get(req, &config).await,
 
-        (&Method::POST, "/webhooks/twitter") => handle_twitter_webhook_post(req, &config).await,
+        (&Method::POST, "/webhooks/twitter") => {
+            handle_twitter_webhook_post(req, &config, send_updates).await
+        }
 
         _ => Ok(Response::builder()
             .status(hyper::StatusCode::NOT_FOUND)
@@ -407,10 +414,11 @@ async fn handle_twitter_webhook_get(
     Ok(response)
 }
 
-/// This function is called when something happens to the subscribed account.
+/// This function is called when something happens to the subscribed account(s).
 async fn handle_twitter_webhook_post(
     req: Request<Body>,
     config: &ServerConfiguration,
+    send_updates: Sender<DisplayStateMutation>,
 ) -> Result<Response<Body>, GenericError> {
     println!("handling Twitter webhook event");
 
@@ -425,7 +433,11 @@ async fn handle_twitter_webhook_post(
         }
     }
 
-    async fn inner(req: Request<Body>, config: &ServerConfiguration) -> Result<(), EarlyExit> {
+    async fn inner(
+        req: Request<Body>,
+        config: &ServerConfiguration,
+        send_updates: Sender<DisplayStateMutation>,
+    ) -> Result<(), EarlyExit> {
         // Validate the request.
 
         let signature = req
@@ -467,6 +479,16 @@ async fn handle_twitter_webhook_post(
             .get(0)
             .ok_or(EarlyExit::Irrelevant("empty DM Event list?"))?;
 
+        // The timestamp is a string giving a Unix time measured in
+        // *milliseconds* since the Epoch.
+        let timestamp: i64 = item
+            .get("created_timestamp")
+            .ok_or(EarlyExit::Error("no created_timestamp".into()))?
+            .as_str()
+            .ok_or(EarlyExit::Error("created_timestamp not stringlike".into()))?
+            .parse()?;
+        let timestamp = chrono::Utc.timestamp(timestamp / 1000, 0);
+
         let item = item
             .get("message_create")
             .ok_or(EarlyExit::Irrelevant("not creation"))?;
@@ -487,17 +509,34 @@ async fn handle_twitter_webhook_post(
             .get("text")
             .ok_or(EarlyExit::Error("no message_data.text".into()))?;
 
-        let text = item
+        let person_is = item
             .as_str()
-            .ok_or(EarlyExit::Error("message text is not a string".into()))?;
+            .ok_or(EarlyExit::Error("message text is not a string".into()))?
+            .to_owned();
 
         // We finally have the text!
-        println!("GOT TEXT: {}", text);
+        println!(" ... update text from Twitter DM: {}", person_is);
 
-        Ok(())
+        if !is_person_is_valid(&person_is) {
+            // In principle we could reply to the DM saying that it doesn't
+            // validate or something ... not bothering to implement that now.
+            return Err(EarlyExit::Irrelevant("update text doesn't validate"));
+        }
+
+        match send_updates.send(DisplayStateMutation::SetPersonIs(
+            PersonIsUpdateHelloMessage {
+                person_is,
+                timestamp,
+            },
+        )) {
+            Ok(_) => Ok(()),
+            Err(_) => Err(EarlyExit::Error(
+                "cannot send display state mutation!".into(),
+            )),
+        }
     }
 
-    let rv = inner(req, config).await;
+    let rv = inner(req, config, send_updates).await;
 
     let response = if let Err(ref e) = rv {
         match e {

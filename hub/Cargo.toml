@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 base64 = "^0.11"
+chrono = "^0.4"
 egg-mode = { git = "https://github.com/pkgw/twitter-rs", branch = "account_activity" }
 futures = "^0.3"
 hyper = "^0.13"

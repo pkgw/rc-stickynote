@@ -338,7 +338,11 @@ fn handle_new_stickyproto_connection(
                 },
             }
 
-            jsonwrite.send(display_state.clone()).await?;
+            if let Err(e) = jsonwrite.send(display_state.clone()).await {
+                println!("error communicating with client: {}", e);
+                println!("giving up on it");
+                break Err(e);
+            }
         }
     });
 

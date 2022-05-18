@@ -173,7 +173,7 @@ pub fn main_cli(opts: super::ClientCommand) -> Result<(), Error> {
     let (sender, receiver) = channel();
     thread::spawn(move || renderer_thread(cloned_config, receiver));
 
-    let mut rt = Runtime::new()?;
+    let rt = Runtime::new()?;
 
     // Ready to start the main event loop
 
@@ -630,7 +630,7 @@ pub fn set_status_cli(opts: super::SetStatusCommand) -> Result<(), Error> {
     openssl_probe::init_ssl_cert_env_vars();
 
     let config: ClientConfiguration = confy::load("rc-stickynote-client")?;
-    let mut rt = Runtime::new()?;
+    let rt = Runtime::new()?;
 
     rt.block_on(async {
         let mut hub_comms = config.connect().await?;

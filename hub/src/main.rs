@@ -56,8 +56,6 @@ struct ServerTwitterConfiguration {
     allowed_sender_id: String,
     consumer_api_key: String,
     consumer_api_secret_key: String,
-    access_token: String,
-    access_token_secret: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

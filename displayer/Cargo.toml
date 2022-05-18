@@ -10,7 +10,8 @@ simulator = ["sdl2"]
 waveshare = ["epd-waveshare"]
 
 [dependencies]
-async-ssh2 = { git = "https://github.com/spebern/async-ssh2.git", branch = "master" }
+async-compat = "^0.2"
+async-ssh2 = "0.1.2-beta"
 chrono = "^0.4"
 confy = "^0.3"
 daemonize = "^0.4"
@@ -26,8 +27,9 @@ rusttype = "^0.8"
 sdl2 = { version = "0.31", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "^1.0"
+smol = "^0.1"
 structopt = "0.3"
 timeago = { version = "^0.2", features = ["chrono"] }
-tokio = { version = "0.2", features = ["dns", "rt-threaded", "stream", "tcp", "time"] }
-tokio-serde = { version = "^0.6", features = ["json"] }
-tokio-util = { version = "0.2.0", features = ["codec"] }
+tokio = { version = "^1.18", features = ["rt-multi-thread", "net", "time"] }
+tokio-serde = { version = "^0.8", features = ["json"] }
+tokio-util = { version = "^0.7", features = ["codec"] }

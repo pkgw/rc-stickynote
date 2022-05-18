@@ -1,5 +1,6 @@
 //! The long-running panel driving client.
 
+use async_compat::Compat;
 use chrono::prelude::*;
 use daemonize::Daemonize;
 use embedded_graphics::{
@@ -17,6 +18,7 @@ use rc_stickynote_protocol::{
 };
 use rusttype::FontCollection;
 use serde::{Deserialize, Serialize};
+use smol::Async;
 use std::{
     fs::File,
     io::{Error, Read},
@@ -82,7 +84,7 @@ macro_rules! tryssh {
 trait AsyncReadAndWrite: AsyncRead + AsyncWrite + Unpin {}
 
 impl AsyncReadAndWrite for TcpStream {}
-impl AsyncReadAndWrite for async_ssh2::Channel {}
+impl AsyncReadAndWrite for Compat<async_ssh2::Channel> {}
 
 /// The type that defines our client/server communication. We use JSON to
 /// encode our messages via Serde, on top of a length-delimited codec because
@@ -102,7 +104,9 @@ impl ClientConfiguration {
             let mut sess = tryssh!(async_ssh2::Session::new());
 
             // NB this is a non-async TcpStream.connect() so it will block the thread!
-            let transport = StdTcpStream::connect((self.hub_host.as_ref(), sshcfg.ssh_port))?;
+            let transport =
+                Async::<StdTcpStream>::connect(format!("{}:{}", self.hub_host, sshcfg.ssh_port))
+                    .await?;
             tryssh!(sess.set_tcp_stream(transport));
 
             tryssh!(sess.handshake().await);
@@ -116,10 +120,10 @@ impl ClientConfiguration {
                 .await
             );
 
-            Ok(Self::wrap_transport(tryssh!(
+            Ok(Self::wrap_transport(Compat::new(tryssh!(
                 sess.channel_direct_tcpip("localhost", self.hub_port, None)
                     .await
-            )))
+            ))))
         } else {
             Ok(Self::wrap_transport(
                 TcpStream::connect((self.hub_host.as_ref(), self.hub_port)).await?,

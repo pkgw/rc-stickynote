@@ -367,7 +367,7 @@ async fn handle_http_request(
 }
 
 /// This function must perform Twitter's "challenge-response check" (CRC, but
-/// not the one you're used to.
+/// not the one you're used to).
 async fn handle_twitter_webhook_get(
     req: Request<Body>,
     config: &ServerConfiguration,

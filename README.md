@@ -96,6 +96,10 @@ To cross-compile the display client for the RPi, run:
 cross build --target armv7-unknown-linux-gnueabihf --release
 ```
 
+For `cross` builds, you may need to blow away the entire `target/` directory in
+order to clear out Cargo “build script” programs built for the different
+platforms.
+
 
 ## Step 4: Build the RPi OS image
 
@@ -152,12 +156,18 @@ To run a “simulator” version of the client that uses
 EPD, run:
 
 ```
-cd displayer && cargo run --no-default-features --features=simulator -- client
+(cd displayer && cargo run --no-default-features --features=simulator -- client)
 ```
 
 This program will require a client configuration file, which should be placed
 in `~/.config/rc-stickynote-client/rc-stickynote-client.toml`. This is the
 same file format as used in `local/client-config.toml`.
+
+The paths to fonts and SSH keys may need customization compared to what goes in
+the RPi client. You can pull fonts out of the RPi image by mounting it locally,
+as described in the next step.
+
+On Fedora, get SDL developer fields by installing the `SDL2-devel` package.
 
 
 ## Testing: Checking the RPi OS image

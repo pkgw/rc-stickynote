@@ -10,6 +10,19 @@ reproducible a fashion as can be managed.
 
 [blobman]: https://github.com/pkgw/blobman/
 
+# STATUS
+
+- RPi can get online and talk to dispatcher!
+- Looks like we need to update how it talks to the GPIO device???
+- Login manually with username sticky, password as per `local/`
+- Network login should be possible if you Wifi through "Harvard University", I think,
+  and you figure out the IP address
+- see: https://crates.io/crates/linux-embedded-hal
+- daemon logs to a file in ~/ (Doc that for real)
+- /usr/local/bin/ program has useful debugging subcommands
+- Actual error is EBUSY on first commit to `/dev/spidev0.0`
+- https://github.com/caemor/epd-waveshare/issues/42
+
 
 ## Hardware
 

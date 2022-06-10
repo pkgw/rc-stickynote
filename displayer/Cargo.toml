@@ -20,7 +20,7 @@ embedded-hal = { version = "^0.2", features = ["unproven"] }
 epd-waveshare = { git = "https://github.com/caemor/epd-waveshare", rev = "35291fe639fef3783e28a410f549d24e758a52ac", features = ["epd7in5", "graphics"], optional = true }
 futures = "^0.3"
 get_if_addrs = "^0.5"
-linux-embedded-hal = "0.2"
+linux-embedded-hal = { version = "^0.3", features = ["gpio_cdev"] }
 openssl-probe = "^0.1"
 rc_stickynote_protocol = { version = "0.1.0", path = "../protocol" }
 rusttype = "^0.8"

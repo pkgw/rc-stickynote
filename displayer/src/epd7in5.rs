@@ -1,4 +1,8 @@
 //! Display backend for the Waveshare 7.5-inch e-Print Display.
+//!
+//! Pin assignments: see
+//! <https://www.waveshare.com/wiki/Template:Raspberry_Pi_Guides_for_SPI_e-Paper>.
+//! Apparently we're in the "BCM2835" side of things.
 
 use epd_waveshare::{
     color::Color,
@@ -7,17 +11,17 @@ use epd_waveshare::{
     prelude::*,
 };
 use linux_embedded_hal::{
+    gpio_cdev::{self, LineRequestFlags},
     spidev::{self, SpidevOptions},
-    sysfs_gpio::Direction,
-    Delay, Pin, Spidev,
+    CdevPin, Delay, Spidev,
 };
-use std::{io::Error, thread::sleep, time::Duration};
+use std::io::Error;
 
 use super::DisplayBackend;
 
 pub struct EPD7in5Backend {
     spi: Spidev,
-    epd7in5: EPD7in5<Spidev, Pin, Pin, Pin, Pin>,
+    epd7in5: EPD7in5<Spidev, CdevPin, CdevPin, CdevPin, CdevPin>,
     display: Display7in5,
 }
 
@@ -36,42 +40,50 @@ impl DisplayBackend for EPD7in5Backend {
         let options = SpidevOptions::new()
             .bits_per_word(8)
             .max_speed_hz(4_000_000)
-            .mode(spidev::SPI_MODE_0)
+            .mode(spidev::SpiModeFlags::SPI_MODE_0)
             .build();
         spi.configure(&options)?;
 
-        let cs = Pin::new(8); // Chip Select pin
-        cs.export().expect("cs export");
-        while !cs.is_exported() {}
+        // TO CHECK: we used to have the Chip Select pin as pin 8,
+        // but based on https://github.com/caemor/epd-waveshare/issues/42,
+        // I think we need to set it to some random other pin, because
+        // the SPI layer manages CS for us ... or something.
+        let mut chip = gpio_cdev::Chip::new("/dev/gpiochip0").unwrap();
+        let line = chip.get_line(23).unwrap(); // unused pin????
+        let cs_handle = line
+            .request(LineRequestFlags::OUTPUT, 1, "rc_stickynote_displayer")
+            .unwrap();
+        let cs = CdevPin::new(cs_handle).unwrap();
+
+        // TO CHECK: can we safely skip this?????? Sleeps also remove from
+        // subsequent stanzas.
+        //
         // See https://github.com/rust-embedded/rust-sysfs-gpio/issues/5 --
-        // after the pin is exported, there is a small window before the
-        // RPi udev system changes permissions on the created device file.
-        // If we try to set the direction before this window elapses, we
-        // fail with EACCES when run as non-root. We're only booting up
-        // infrequently, so just hardcode a delay.
-        sleep(Duration::from_millis(750));
-        cs.set_direction(Direction::Out).expect("CS Direction");
-        cs.set_value(1).expect("CS Value set to 1");
+        // after the CdevPin is exported, there is a small window before the RPi
+        // udev system changes permissions on the created device file. If we try
+        // to set the direction before this window elapses, we fail with EACCES
+        // when run as non-root. We're only booting up infrequently, so just
+        // hardcode a delay. sleep(Duration::from_millis(750));
 
-        let busy = Pin::new(24); // Busy pin
-        busy.export().expect("busy export");
-        while !busy.is_exported() {}
-        sleep(Duration::from_millis(750)); // see above
-        busy.set_direction(Direction::In).expect("busy Direction");
+        cs.set_value(1).expect("CS value set to 1");
 
-        let dc = Pin::new(25);
-        dc.export().expect("dc export");
-        while !dc.is_exported() {}
-        sleep(Duration::from_millis(750)); // see above
-        dc.set_direction(Direction::Out).expect("dc Direction");
-        dc.set_value(1).expect("dc Value set to 1");
+        let line = chip.get_line(24).unwrap(); // Busy pin
+        let busy_handle = line
+            .request(LineRequestFlags::INPUT, 0, "rc_stickynote_displayer")
+            .unwrap();
+        let busy = CdevPin::new(busy_handle).unwrap();
 
-        let rst = Pin::new(17);
-        rst.export().expect("rst export");
-        while !rst.is_exported() {}
-        sleep(Duration::from_millis(750)); // see above
-        rst.set_direction(Direction::Out).expect("rst Direction");
-        rst.set_value(1).expect("rst Value set to 1");
+        let line = chip.get_line(25).unwrap(); // DC pin
+        let dc_handle = line
+            .request(LineRequestFlags::OUTPUT, 1, "rc_stickynote_displayer")
+            .unwrap();
+        let dc = CdevPin::new(dc_handle).unwrap();
+
+        let line = chip.get_line(17).unwrap(); // RST pin
+        let rst_handle = line
+            .request(LineRequestFlags::OUTPUT, 1, "rc_stickynote_displayer")
+            .unwrap();
+        let rst = CdevPin::new(rst_handle).unwrap();
 
         let mut delay = Delay {};
         let epd7in5 = EPD7in5::new(&mut spi, cs, busy, dc, rst, &mut delay)?;

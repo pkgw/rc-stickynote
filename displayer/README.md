@@ -5,7 +5,7 @@ on the e-Paper screen!
 
 This crate actually has features. The default feature `waveshare` will include
 the crate `epd-waveshare` as a dependency, and build an executable that tries
-to send commands to a real Waveshare display using SPI.
+to send commands to a real Waveshare display using SPI and GPIO.
 
 The feature `simulator`, which is incompatible with `waveshare`, uses an
 SDL2-based simulator instead. This can be used for testing on a standard Linux
@@ -35,3 +35,7 @@ are:
   program will sleep and retry for 100 seconds. This makes it suitable to be
   run at bootup so that if your RPi automatically establishes some kind of
   network connection, you can see its address and know where to SSH to.
+
+
+## Dependencies
+

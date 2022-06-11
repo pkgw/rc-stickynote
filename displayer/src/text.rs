@@ -67,29 +67,68 @@ pub struct Layout {
 }
 
 impl Layout {
-    /// Represent this rasterization as a pixel iterator suitable for
-    /// consumption by `embedded_graphics::Drawing::draw()`.
+    /// Set up this rasterization for drawing.
     ///
     /// If some of the text falls at `x < 0` or `y < 0`, it will be clipped.
-    pub fn draw_at<'a, C: PixelColor>(
+    pub fn style<'a, C: PixelColor>(
         &'a self,
         x0: i32,
         y0: i32,
         fg: C,
         bg: C,
-    ) -> LayoutPixelIter<'a, C> {
-        let ix = if x0 < 0 { -x0 } else { 0 } as usize;
-        let iy = if y0 < 0 { -y0 } else { 0 } as usize;
-
-        LayoutPixelIter {
+    ) -> StyledLayout<'a, C> {
+        StyledLayout {
             layout: self,
             x0,
             y0,
-            ix,
-            iy,
             fg,
             bg,
         }
+    }
+}
+
+/// tmptmp.
+#[derive(Debug)]
+pub struct StyledLayout<'a, C> {
+    layout: &'a Layout,
+    x0: i32,
+    y0: i32,
+    fg: C,
+    bg: C,
+}
+
+impl<'a, 'b, C: PixelColor> IntoIterator for &'a StyledLayout<'b, C> {
+    type Item = Pixel<C>;
+    type IntoIter = LayoutPixelIter<'b, C>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let ix = if self.x0 < 0 { -self.x0 } else { 0 } as usize;
+        let iy = if self.y0 < 0 { -self.y0 } else { 0 } as usize;
+
+        LayoutPixelIter {
+            layout: self.layout,
+            x0: self.x0,
+            y0: self.y0,
+            ix,
+            iy,
+            fg: self.fg,
+            bg: self.bg,
+        }
+    }
+}
+
+impl<'a, C: PixelColor> Drawable for StyledLayout<'a, C> {
+    type Color = C;
+    type Output = ();
+
+    // TODO: this API is not necessarily efficient. We're doing this since it's
+    // a straightforward port of what we had for embedded-graphics 0.5, but I
+    // believe that better approaches are now possible.
+    fn draw<D>(&self, target: &mut D) -> Result<Self::Output, <D as DrawTarget>::Error>
+    where
+        D: DrawTarget<Color = Self::Color>,
+    {
+        target.draw_iter(self)
     }
 }
 
@@ -135,6 +174,8 @@ impl<'a, C: PixelColor> Iterator for LayoutPixelIter<'a, C> {
             self.iy += 1;
         }
 
-        Some(Pixel(UnsignedCoord(rx, ry), rc))
+        // TODO: for embedded-graphics 0.5 this used to be UnsignedCoord; should
+        // we do something better than converting the u32 to i32?
+        Some(Pixel(Point::new(rx as i32, ry as i32), rc))
     }
 }

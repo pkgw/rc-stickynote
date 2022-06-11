@@ -4,9 +4,10 @@
 //! <https://www.waveshare.com/wiki/Template:Raspberry_Pi_Guides_for_SPI_e-Paper>.
 //! Apparently we're in the "BCM2835" side of things.
 
+use embedded_graphics::pixelcolor::BinaryColor;
 use epd_waveshare::{
-    color::Color,
-    epd7in5::{Display7in5, EPD7in5},
+    color::Color as WaveshareColor,
+    epd7in5::{Display7in5, Epd7in5},
     graphics::Display,
     prelude::*,
 };
@@ -19,18 +20,26 @@ use std::io::Error;
 
 use super::DisplayBackend;
 
-pub struct EPD7in5Backend {
+pub struct Epd7in5Backend {
     spi: Spidev,
-    epd7in5: EPD7in5<Spidev, CdevPin, CdevPin, CdevPin, CdevPin>,
+    epd7in5: Epd7in5<Spidev, CdevPin, CdevPin, CdevPin, CdevPin, Delay>,
     display: Display7in5,
+    delay: Delay,
 }
 
-impl DisplayBackend for EPD7in5Backend {
-    type Color = Color;
+fn binary_color_to_waveshare(c: BinaryColor) -> WaveshareColor {
+    match c {
+        BinaryColor::On => WaveshareColor::Black,
+        BinaryColor::Off => WaveshareColor::White,
+    }
+}
+
+impl DisplayBackend for Epd7in5Backend {
+    type Color = BinaryColor;
     type Buffer = Display7in5;
 
-    const BLACK: Color = Color::Black;
-    const WHITE: Color = Color::White;
+    const BLACK: BinaryColor = BinaryColor::On;
+    const WHITE: BinaryColor = BinaryColor::Off;
 
     fn open() -> Result<Self, Error> {
         // This is all copied from the epd-waveshare 7in5 example.
@@ -86,20 +95,21 @@ impl DisplayBackend for EPD7in5Backend {
         let rst = CdevPin::new(rst_handle).unwrap();
 
         let mut delay = Delay {};
-        let epd7in5 = EPD7in5::new(&mut spi, cs, busy, dc, rst, &mut delay)?;
+        let epd7in5 = Epd7in5::new(&mut spi, cs, busy, dc, rst, &mut delay)?;
         let mut display = Display7in5::default();
 
         display.set_rotation(DisplayRotation::Rotate270);
 
-        Ok(EPD7in5Backend {
+        Ok(Epd7in5Backend {
             spi,
             epd7in5,
             display,
+            delay,
         })
     }
 
     fn clear_buffer(&mut self, color: Self::Color) -> Result<(), Error> {
-        self.display.clear_buffer(color);
+        self.display.clear_buffer(binary_color_to_waveshare(color));
         Ok(())
     }
 
@@ -109,23 +119,22 @@ impl DisplayBackend for EPD7in5Backend {
 
     fn show_buffer(&mut self) -> Result<(), Error> {
         self.epd7in5
-            .update_frame(&mut self.spi, &self.display.buffer())?;
-        self.epd7in5.display_frame(&mut self.spi)?;
+            .update_frame(&mut self.spi, &self.display.buffer(), &mut self.delay)?;
+        self.epd7in5.display_frame(&mut self.spi, &mut self.delay)?;
         Ok(())
     }
 
     fn clear_display(&mut self) -> Result<(), Error> {
-        self.epd7in5.clear_frame(&mut self.spi)?;
-        self.epd7in5.display_frame(&mut self.spi)?;
+        self.epd7in5.clear_frame(&mut self.spi, &mut self.delay)?;
+        self.epd7in5.display_frame(&mut self.spi, &mut self.delay)?;
         Ok(())
     }
 
     fn sleep_device(&mut self) -> Result<(), Error> {
-        Ok(self.epd7in5.sleep(&mut self.spi)?)
+        Ok(self.epd7in5.sleep(&mut self.spi, &mut self.delay)?)
     }
 
     fn wake_up_device(&mut self) -> Result<(), Error> {
-        let mut delay = Delay {};
-        Ok(self.epd7in5.wake_up(&mut self.spi, &mut delay)?)
+        Ok(self.epd7in5.wake_up(&mut self.spi, &mut self.delay)?)
     }
 }

@@ -15,9 +15,9 @@ async-ssh2 = "0.1.2-beta"
 chrono = "^0.4"
 confy = "^0.3"
 daemonize = "^0.4"
-embedded-graphics = "^0.5"
+embedded-graphics = "^0.7"
 embedded-hal = { version = "^0.2", features = ["unproven"] }
-epd-waveshare = { git = "https://github.com/caemor/epd-waveshare", rev = "35291fe639fef3783e28a410f549d24e758a52ac", features = ["epd7in5", "graphics"], optional = true }
+epd-waveshare = { version = "^0.5", optional = true }
 futures = "^0.3"
 get_if_addrs = "^0.5"
 linux-embedded-hal = { version = "^0.3", features = ["gpio_cdev"] }

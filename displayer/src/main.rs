@@ -1,7 +1,12 @@
 //! The program that renders information to the e-Print Display. (Or a
 //! simulated version thereof.)
 
-use embedded_graphics::{coord::Coord, fonts::Font6x8, prelude::*, Drawing};
+use embedded_graphics::{
+    mono_font::{ascii::FONT_6X10, MonoTextStyle},
+    pixelcolor::BinaryColor,
+    prelude::*,
+    text::Text,
+};
 use rusttype::FontCollection;
 use std::{
     fs::File,
@@ -15,7 +20,7 @@ use structopt::StructOpt;
 #[cfg(feature = "waveshare")]
 mod epd7in5;
 #[cfg(feature = "waveshare")]
-use epd7in5::EPD7in5Backend as Backend;
+use epd7in5::Epd7in5Backend as Backend;
 
 #[cfg(feature = "simulator")]
 mod simulator;
@@ -28,7 +33,7 @@ use text::DrawFontExt;
 
 trait DisplayBackend: Sized {
     type Color: embedded_graphics::pixelcolor::PixelColor;
-    type Buffer: Drawing<Self::Color>;
+    type Buffer: DrawTarget;
 
     const BLACK: Self::Color;
     const WHITE: Self::Color;
@@ -111,60 +116,47 @@ impl DemoFontCommand {
         {
             let buffer = backend.get_buffer_mut();
 
-            buffer.draw(
-                font.rasterize("The quick brown fox jumps over the lazy dog.", 10.0)
-                    .draw_at(10, 10, Backend::BLACK, Backend::WHITE),
-            );
+            font.rasterize("The quick brown fox jumps over the lazy dog.", 10.0)
+                .style(10, 10, Backend::BLACK, Backend::WHITE)
+                .draw(buffer)
+                .unwrap();
 
-            buffer.draw(
-                font.rasterize("The quick brown fox jumps over the lazy dog.", 14.0)
-                    .draw_at(10, 30, Backend::BLACK, Backend::WHITE),
-            );
+            font.rasterize("The quick brown fox jumps over the lazy dog.", 14.0)
+                .style(10, 30, Backend::BLACK, Backend::WHITE)
+                .draw(buffer)
+                .unwrap();
 
-            buffer.draw(font.rasterize("The quick brown fox", 20.0).draw_at(
-                10,
-                58,
-                Backend::BLACK,
-                Backend::WHITE,
-            ));
-            buffer.draw(font.rasterize("jumps over the lazy dog.", 20.0).draw_at(
-                10,
-                80,
-                Backend::BLACK,
-                Backend::WHITE,
-            ));
+            font.rasterize("The quick brown fox", 20.0)
+                .style(10, 58, Backend::BLACK, Backend::WHITE)
+                .draw(buffer)
+                .unwrap();
 
-            buffer.draw(font.rasterize("The quick brown fox", 32.0).draw_at(
-                10,
-                110,
-                Backend::BLACK,
-                Backend::WHITE,
-            ));
-            buffer.draw(font.rasterize("jumps over the lazy dog.", 32.0).draw_at(
-                10,
-                138,
-                Backend::BLACK,
-                Backend::WHITE,
-            ));
+            font.rasterize("jumps over the lazy dog.", 20.0)
+                .style(10, 80, Backend::BLACK, Backend::WHITE)
+                .draw(buffer)
+                .unwrap();
 
-            buffer.draw(font.rasterize("The quick brown", 48.0).draw_at(
-                10,
-                184,
-                Backend::BLACK,
-                Backend::WHITE,
-            ));
-            buffer.draw(font.rasterize("fox jumps over", 48.0).draw_at(
-                10,
-                230,
-                Backend::BLACK,
-                Backend::WHITE,
-            ));
-            buffer.draw(font.rasterize("the lazy dog.", 48.0).draw_at(
-                10,
-                276,
-                Backend::BLACK,
-                Backend::WHITE,
-            ));
+            font.rasterize("The quick brown fox", 32.0)
+                .style(10, 110, Backend::BLACK, Backend::WHITE)
+                .draw(buffer)
+                .unwrap();
+            font.rasterize("jumps over the lazy dog.", 32.0)
+                .style(10, 138, Backend::BLACK, Backend::WHITE)
+                .draw(buffer)
+                .unwrap();
+
+            font.rasterize("The quick brown", 48.0)
+                .style(10, 184, Backend::BLACK, Backend::WHITE)
+                .draw(buffer)
+                .unwrap();
+            font.rasterize("fox jumps over", 48.0)
+                .style(10, 230, Backend::BLACK, Backend::WHITE)
+                .draw(buffer)
+                .unwrap();
+            font.rasterize("the lazy dog.", 48.0)
+                .style(10, 276, Backend::BLACK, Backend::WHITE)
+                .draw(buffer)
+                .unwrap();
         }
 
         backend.show_buffer()?;
@@ -209,16 +201,9 @@ impl ShowIpsCommand {
 
                 let mut y = 50;
 
-                buffer.draw(
-                    Font6x8::render_str("IP addresses:")
-                        .style(Style {
-                            fill_color: Some(Backend::WHITE),
-                            stroke_color: Some(Backend::BLACK),
-                            stroke_width: 0u8, // Has no effect on fonts
-                        })
-                        .translate(Coord::new(50, y))
-                        .into_iter(),
-                );
+                let style = MonoTextStyle::new(&FONT_6X10, BinaryColor::On);
+                let text = Text::new("IP addresses:", Point::new(50, y), style);
+                text.draw(buffer).unwrap();
 
                 y += 20;
 
@@ -226,18 +211,8 @@ impl ShowIpsCommand {
                     if !iface.is_loopback() {
                         if let get_if_addrs::IfAddr::V4(ref addr) = iface.addr {
                             let text = format!("{}   {}", iface.name, addr.ip);
-
-                            buffer.draw(
-                                Font6x8::render_str(&text)
-                                    .style(Style {
-                                        fill_color: Some(Backend::WHITE),
-                                        stroke_color: Some(Backend::BLACK),
-                                        stroke_width: 0u8, // Has no effect on fonts
-                                    })
-                                    .translate(Coord::new(50, y))
-                                    .into_iter(),
-                            );
-
+                            let text = Text::new(&text, Point::new(50, y), style);
+                            text.draw(buffer).unwrap();
                             y += 10;
                             got_any = true;
                         }

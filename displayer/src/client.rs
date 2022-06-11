@@ -4,12 +4,11 @@ use async_compat::Compat;
 use chrono::prelude::*;
 use daemonize::Daemonize;
 use embedded_graphics::{
-    coord::Coord,
-    fonts::{Font, Font6x8},
-    primitives::{Line, Rectangle},
-    style::{Style, WithStyle},
-    transform::Transform,
-    Drawing,
+    mono_font::{ascii::FONT_6X10, MonoTextStyle},
+    pixelcolor::BinaryColor,
+    prelude::*,
+    primitives::{Line, PrimitiveStyle, PrimitiveStyleBuilder, Rectangle},
+    text::Text,
 };
 use futures::{prelude::*, select};
 use rc_stickynote_protocol::{
@@ -406,16 +405,9 @@ fn renderer_thread_inner(
             let buffer = backend.get_buffer_mut();
 
             fn draw6x8(buf: &mut <Backend as DisplayBackend>::Buffer, s: &str, x: i32, y: i32) {
-                buf.draw(
-                    Font6x8::render_str(s)
-                        .style(Style {
-                            fill_color: Some(Backend::WHITE),
-                            stroke_color: Some(Backend::BLACK),
-                            stroke_width: 0u8, // Has no effect on fonts
-                        })
-                        .translate(Coord::new(x, y))
-                        .into_iter(),
-                );
+                let style = MonoTextStyle::new(&FONT_6X10, BinaryColor::On);
+                let text = Text::new(s, Point::new(x, y), style);
+                text.draw(buf).unwrap();
             }
 
             fn draw6x8inverted(
@@ -424,28 +416,19 @@ fn renderer_thread_inner(
                 x: i32,
                 y: i32,
             ) {
-                buf.draw(
-                    Font6x8::render_str(s)
-                        .style(Style {
-                            fill_color: Some(Backend::BLACK),
-                            stroke_color: Some(Backend::WHITE),
-                            stroke_width: 0u8, // Has no effect on fonts
-                        })
-                        .translate(Coord::new(x, y))
-                        .into_iter(),
-                );
+                let style = MonoTextStyle::new(&FONT_6X10, BinaryColor::Off);
+                let text = Text::new(s, Point::new(x, y), style);
+                text.draw(buf).unwrap();
             }
 
             // The clock
 
             let now = dd.now.format("%I:%M %p").to_string();
-
-            buffer.draw(sans_font.rasterize(&now, 56.0).draw_at(
-                2,
-                0,
-                Backend::BLACK,
-                Backend::WHITE,
-            ));
+            sans_font
+                .rasterize(&now, 56.0)
+                .style(2, 0, Backend::BLACK, Backend::WHITE)
+                .draw(buffer)
+                .unwrap();
 
             let x = 230;
             let y = 8;
@@ -458,13 +441,16 @@ fn renderer_thread_inner(
 
             // hline
 
-            buffer.draw(
-                Line::new(Coord::new(0, 52), Coord::new(383, 52)).style(Style {
-                    fill_color: Some(Backend::BLACK),
-                    stroke_color: Some(Backend::BLACK),
-                    stroke_width: 1u8,
-                }),
-            );
+            let style = PrimitiveStyleBuilder::new()
+                .fill_color(Backend::BLACK)
+                .stroke_color(Backend::BLACK)
+                .stroke_width(1)
+                .build();
+
+            Line::new(Point::new(0, 52), Point::new(383, 52))
+                .into_styled(style)
+                .draw(buffer)
+                .unwrap();
 
             // "The Innovation Scientist is ..." text
 
@@ -472,29 +458,27 @@ fn renderer_thread_inner(
             let y = 54;
             let delta = 54;
 
-            buffer.draw(serif_font.rasterize("The Innovation", 64.0).draw_at(
-                x,
-                y,
-                Backend::BLACK,
-                Backend::WHITE,
-            ));
+            serif_font
+                .rasterize("The Innovation", 64.0)
+                .style(x, y, Backend::BLACK, Backend::WHITE)
+                .draw(buffer)
+                .unwrap();
 
-            buffer.draw(serif_font.rasterize("Scientist is:", 64.0).draw_at(
-                x + 2,
-                y + delta,
-                Backend::BLACK,
-                Backend::WHITE,
-            ));
+            serif_font
+                .rasterize("Scientist is:", 64.0)
+                .style(x + 2, y + delta, Backend::BLACK, Backend::WHITE)
+                .draw(buffer)
+                .unwrap();
 
             // The actual status message
 
             let y = y + 2 * delta + 12;
             let delta = delta;
 
-            buffer.draw(
-                Rectangle::new(Coord::new(0, y), Coord::new(383, y + delta))
-                    .fill(Some(Backend::BLACK)),
-            );
+            Rectangle::with_corners(Point::new(0, y), Point::new(383, y + delta))
+                .into_styled(PrimitiveStyle::with_fill(Backend::BLACK))
+                .draw(buffer)
+                .unwrap();
 
             let layout = sans_font.rasterize(&dd.person_is, 32.0);
             let x = if layout.width as i32 > 384 {
@@ -508,7 +492,10 @@ fn renderer_thread_inner(
                 (delta - layout.height as i32) / 2
             };
 
-            buffer.draw(layout.draw_at(x, y + yofs, Backend::WHITE, Backend::BLACK));
+            layout
+                .style(x, y + yofs, Backend::WHITE, Backend::BLACK)
+                .draw(buffer)
+                .unwrap();
 
             // "updated at ..." to go with the status message
 
@@ -529,10 +516,10 @@ fn renderer_thread_inner(
             let y = 630;
             let delta = 9;
 
-            buffer.draw(
-                Rectangle::new(Coord::new(0, y), Coord::new(383, y + delta))
-                    .fill(Some(Backend::BLACK)),
-            );
+            Rectangle::with_corners(Point::new(0, y), Point::new(383, y + delta))
+                .into_styled(PrimitiveStyle::with_fill(Backend::BLACK))
+                .draw(buffer)
+                .unwrap();
 
             draw6x8inverted(buffer, "https://github.com/pkgw/rc-stickynote", 2, y + 1);
 

@@ -261,7 +261,7 @@ enum RootCli {
     DemoFont(DemoFontCommand),
 
     #[structopt(name = "set-status")]
-    /// Set the "scientist is:" satus on the display
+    /// Set the "scientist is:" status on the display
     SetStatus(SetStatusCommand),
 
     #[structopt(name = "show-ips")]

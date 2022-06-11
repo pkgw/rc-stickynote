@@ -403,13 +403,13 @@ fn renderer_thread_inner(
             backend.clear_buffer(Backend::WHITE)?;
             let buffer = backend.get_buffer_mut();
 
-            fn draw6x8(buf: &mut <Backend as DisplayBackend>::Buffer, s: &str, x: i32, y: i32) {
+            fn draw6x10(buf: &mut <Backend as DisplayBackend>::Buffer, s: &str, x: i32, y: i32) {
                 let style = MonoTextStyle::new(&FONT_6X10, Backend::BLACK);
                 let text = Text::new(s, Point::new(x, y), style);
                 text.draw(buf).unwrap();
             }
 
-            fn draw6x8inverted(
+            fn draw6x10inverted(
                 buf: &mut <Backend as DisplayBackend>::Buffer,
                 s: &str,
                 x: i32,
@@ -431,12 +431,12 @@ fn renderer_thread_inner(
 
             let x = 230;
             let y = 8;
-            let delta = 10;
+            let delta = 12;
 
-            draw6x8(buffer, "May be up to 15 minutes", x, y + 0 * delta);
-            draw6x8(buffer, "out of date. If much more", x, y + 1 * delta);
-            draw6x8(buffer, "than that, tell Peter his", x, y + 2 * delta);
-            draw6x8(buffer, "sticky note is broken.", x, y + 3 * delta);
+            draw6x10(buffer, "May be up to 15 minutes", x, y + 0 * delta);
+            draw6x10(buffer, "out of date. If much more", x, y + 1 * delta);
+            draw6x10(buffer, "than that, tell Peter his", x, y + 2 * delta);
+            draw6x10(buffer, "sticky note is broken.", x, y + 3 * delta);
 
             // hline
 
@@ -498,7 +498,7 @@ fn renderer_thread_inner(
 
             // "updated at ..." to go with the status message
 
-            let y = y + delta + 4;
+            let y = y + delta + 12;
 
             let msg = format!(
                 "updated at {} (more than {})",
@@ -508,22 +508,22 @@ fn renderer_thread_inner(
                 ago_formatter.convert_chrono(dd.person_is_timestamp, dd.now)
             );
             let x = 382 - 6 * (msg.len() as i32);
-            draw6x8(buffer, &msg, x, y);
+            draw6x10(buffer, &msg, x, y);
 
             // Footer and IP address
 
-            let y = 630;
-            let delta = 9;
+            let y = 628;
+            let delta = 11;
 
             Rectangle::with_corners(Point::new(0, y), Point::new(383, y + delta))
                 .into_styled(PrimitiveStyle::with_fill(Backend::BLACK))
                 .draw(buffer)
                 .unwrap();
 
-            draw6x8inverted(buffer, "https://github.com/pkgw/rc-stickynote", 2, y + 1);
+            draw6x10inverted(buffer, "https://github.com/pkgw/rc-stickynote", 2, y + 8);
 
             let x = 382 - 6 * (dd.ip_addr.len() as i32);
-            draw6x8inverted(buffer, &dd.ip_addr, x, y + 1);
+            draw6x10inverted(buffer, &dd.ip_addr, x, y + 8);
         }
 
         // https://www.waveshare.com/wiki/E-Paper_Driver_HAT:

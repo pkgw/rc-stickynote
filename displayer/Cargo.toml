@@ -16,7 +16,6 @@ chrono = "^0.4"
 confy = "^0.3"
 daemonize = "^0.4"
 embedded-graphics = "^0.7"
-embedded-hal = { version = "^0.2" }
 epd-waveshare = { version = "^0.5", optional = true }
 futures = "^0.3"
 get_if_addrs = "^0.5"

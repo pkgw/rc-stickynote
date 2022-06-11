@@ -3,7 +3,6 @@
 
 use embedded_graphics::{
     mono_font::{ascii::FONT_6X10, MonoTextStyle},
-    pixelcolor::BinaryColor,
     prelude::*,
     text::Text,
 };
@@ -201,7 +200,7 @@ impl ShowIpsCommand {
 
                 let mut y = 50;
 
-                let style = MonoTextStyle::new(&FONT_6X10, BinaryColor::On);
+                let style = MonoTextStyle::new(&FONT_6X10, Backend::BLACK);
                 let text = Text::new("IP addresses:", Point::new(50, y), style);
                 text.draw(buffer).unwrap();
 

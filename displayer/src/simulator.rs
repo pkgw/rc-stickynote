@@ -13,7 +13,7 @@
 // don't use, so:
 #![allow(unused)]
 
-use embedded_graphics::{drawable::Pixel, prelude::*, Drawing};
+use embedded_graphics::{pixelcolor::raw::RawU1, prelude::*, primitives::Rectangle};
 use sdl2::{event::Event, keyboard::Keycode, pixels::Color, rect::Rect, render};
 use std::{io::Error, thread, time::Duration};
 
@@ -25,7 +25,9 @@ use super::DisplayBackend;
 #[derive(Clone, Copy, PartialEq)]
 pub struct SimPixelColor(pub bool);
 
-impl PixelColor for SimPixelColor {}
+impl PixelColor for SimPixelColor {
+    type Raw = RawU1;
+}
 
 impl From<u8> for SimPixelColor {
     fn from(other: u8) -> Self {
@@ -96,12 +98,24 @@ impl Display {
     }
 }
 
-impl Drawing<SimPixelColor> for Display {
-    fn draw<T>(&mut self, item_pixels: T)
+impl Dimensions for Display {
+    fn bounding_box(&self) -> Rectangle {
+        Rectangle::new(
+            Point::new(0, 0),
+            Size::new(self.width as u32, self.height as u32),
+        )
+    }
+}
+
+impl DrawTarget for Display {
+    type Color = SimPixelColor;
+    type Error = ();
+
+    fn draw_iter<I>(&mut self, pixels: I) -> Result<(), Self::Error>
     where
-        T: IntoIterator<Item = Pixel<SimPixelColor>>,
+        I: IntoIterator<Item = Pixel<SimPixelColor>>,
     {
-        for Pixel(coord, color) in item_pixels {
+        for Pixel(coord, color) in pixels {
             let x = coord[0] as usize;
             let y = coord[1] as usize;
 
@@ -111,6 +125,8 @@ impl Drawing<SimPixelColor> for Display {
 
             self.pixels[y * self.width + x] = color;
         }
+
+        Ok(())
     }
 }
 

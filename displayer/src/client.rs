@@ -5,7 +5,6 @@ use chrono::prelude::*;
 use daemonize::Daemonize;
 use embedded_graphics::{
     mono_font::{ascii::FONT_6X10, MonoTextStyle},
-    pixelcolor::BinaryColor,
     prelude::*,
     primitives::{Line, PrimitiveStyle, PrimitiveStyleBuilder, Rectangle},
     text::Text,
@@ -405,7 +404,7 @@ fn renderer_thread_inner(
             let buffer = backend.get_buffer_mut();
 
             fn draw6x8(buf: &mut <Backend as DisplayBackend>::Buffer, s: &str, x: i32, y: i32) {
-                let style = MonoTextStyle::new(&FONT_6X10, BinaryColor::On);
+                let style = MonoTextStyle::new(&FONT_6X10, Backend::BLACK);
                 let text = Text::new(s, Point::new(x, y), style);
                 text.draw(buf).unwrap();
             }
@@ -416,7 +415,7 @@ fn renderer_thread_inner(
                 x: i32,
                 y: i32,
             ) {
-                let style = MonoTextStyle::new(&FONT_6X10, BinaryColor::Off);
+                let style = MonoTextStyle::new(&FONT_6X10, Backend::WHITE);
                 let text = Text::new(s, Point::new(x, y), style);
                 text.draw(buf).unwrap();
             }

@@ -35,7 +35,3 @@ are:
   program will sleep and retry for 100 seconds. This makes it suitable to be
   run at bootup so that if your RPi automatically establishes some kind of
   network connection, you can see its address and know where to SSH to.
-
-
-## Dependencies
-

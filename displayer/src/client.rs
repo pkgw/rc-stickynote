@@ -518,7 +518,8 @@ fn renderer_thread_inner(
             let x = 382 - 6 * (msg.len() as i32);
             draw6x10(buffer, &msg, x, y);
 
-            // Footer and IP address
+            // Footer and IP address. URL needs to be indented a bit since
+            // a piece of tape covers the lower-left corner of my screen.
 
             let y = 628;
             let delta = 11;
@@ -528,7 +529,7 @@ fn renderer_thread_inner(
                 .draw(buffer)
                 .unwrap();
 
-            draw6x10inverted(buffer, "https://github.com/pkgw/rc-stickynote", 2, y + 8);
+            draw6x10inverted(buffer, "https://github.com/pkgw/rc-stickynote", 12, y + 8);
 
             let x = 382 - 6 * (dd.ip_addr.len() as i32);
             draw6x10inverted(buffer, &dd.ip_addr, x, y + 8);

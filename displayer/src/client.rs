@@ -497,15 +497,23 @@ fn renderer_thread_inner(
                 .unwrap();
 
             // "updated at ..." to go with the status message
+            //
+            // `timeago` provides some knobs for adjusting the "now" text that
+            // you get for very small "ago" values, but I think our little
+            // customization here remains necessary.
 
             let y = y + delta + 12;
 
+            let ago = ago_formatter.convert_chrono(dd.person_is_timestamp, dd.now);
+            let ago_prefix = if ago == "now" { "just" } else { "more than" };
+
             let msg = format!(
-                "updated at {} (more than {})",
+                "updated at {} ({} {})",
                 dd.person_is_timestamp
                     .with_timezone(&dd.now.timezone())
                     .format("%I:%M %p"),
-                ago_formatter.convert_chrono(dd.person_is_timestamp, dd.now)
+                ago_prefix,
+                ago,
             );
             let x = 382 - 6 * (msg.len() as i32);
             draw6x10(buffer, &msg, x, y);

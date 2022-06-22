@@ -142,9 +142,18 @@ PREV_ROOTFS_DIR=/pigenwork/stage1/rootfs` to the `build.sh` environment, where
 `PREV_ROOTFS_DIR` specifies the `rootfs` directory of the previous stage (e.g.,
 `stage1` if you're just rerunning `stage2`).
 
+For the specific case of only rebuilding the image to update the displayer client
+(after a `cross build`), use:
+
+```
+vagrant ssh -c "cd /vagrant/semi-pi-gen && sudo PREV_ROOTFS_DIR=/pigenwork/stage1/rootfs STAGE_LIST=stage2 ./build.sh"
+```
+
+
+
 To write the image to an SD card, first insert the card into your machine. If it
 already contained an OS image, your computer might mount the partitions, which
-we definitely don't want! Ummount anything like `/run/$USER/media/boot` or
+we definitely don't want! Unmount anything like `/run/$USER/media/boot` or
 `/run/$USER/media/rootfs` that appears.
 
 Once that's done, the obvious GUI method didn't work for me and I don't feel
